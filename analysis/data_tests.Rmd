@@ -1,0 +1,644 @@
+---
+title: "Exploring how thingd work"
+author: "Shannon Dickson"
+date: "`r format(Sys.Date(), '%B %d %Y')`"
+output: 
+   bookdown::html_document2:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: false
+    code_folding: hide
+    theme: paper
+---
+
+<style type="text/css">
+  
+body{ /* Normal  */
+  font-size: 12px;
+  }
+td {  /* Table  */
+  font-size: 12px;
+}
+h1.title {
+  font-size: 18px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 18px;
+}
+h2 { /* Header 2 */
+  font-size: 18px;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+}
+code.r{ /* Code block */
+  font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+  font-size: 14px;
+}
+</style>
+
+---
+
+```{r setup, echo = FALSE}
+library(knitr)
+knitr::opts_chunk$set(message = FALSE, 
+                      warning = FALSE)
+```
+
+```{r, echo = FALSE}
+# Packages
+library(dplyr)
+library(magrittr)
+library(qgraph)
+library(mgm)
+library(devtools)
+library(kableExtra)
+
+# Full data
+data_enc <- readRDS("data/data_enc.RDS")
+# Mode data - encoded
+f2f_enc <- readRDS("data/data_f2f_enc.RDS")
+mail_enc <- readRDS("data/data_mail_enc.RDS")
+web_enc <- readRDS("data/data_web_enc.RDS")
+paper_enc <- readRDS("data/data_paper_enc.RDS")
+tel_enc <- readRDS("data/data_tel_enc.RDS")
+
+# Remove attributes from the data
+data_enc[]<-lapply(data_enc, function(x) { attributes(x) <- NULL; x })
+f2f_enc[]<-lapply(f2f_enc, function(x) { attributes(x) <- NULL; x })
+mail_enc[]<-lapply(mail_enc, function(x) { attributes(x) <- NULL; x })
+web_enc[]<-lapply(web_enc, function(x) { attributes(x) <- NULL; x })
+tel_enc[]<-lapply(tel_enc, function(x) { attributes(x) <- NULL; x })
+```
+
+# Network Modelling of Survey Characteristics
+
+## Data preparation 
+
+Our data has around 90 coded characteristics of different surveys, but we are only interested in some. Below we select the characteristics that we believe influence the nonresponse rate and nonresponse bias more strongly. 
+
+```{r}
+data_key <- data.frame("Variable" = c("Absolute Relative Bias", "Nonresponse Rate",
+                                      "Year", "Saliency", "Incentives", "Sponsorship",
+                                      "Topic", "Mode", "Population", "Question Type"),
+                       "Key"      = c("Numerical", "Numerical", "Numerical",
+                                      "0 = Yes; 1 = No",
+                                      "0 = No; 1 = Yes",
+                                      "0 = Yes; 1 = No",
+                                      "0 = Other; 1 = Health",
+                                      "0 = F2F; 1 = Web; 2 = Paper drop; 3 = Mail; 4 = Telephone",
+                                      "0 = Yes; 1 = No",
+                                      "0 = Demographic; 1 = Unobservable"))
+
+data_key %>% 
+  kbl(caption = "Information on how variables are coded") %>% 
+  kable_paper(bootstrap_options = "striped", full_width = TRUE) %>% 
+  column_spec(1, bold = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+
+```{r}
+# Select the relevant variables
+data_net <- data_enc %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, Mode, SpecialPop, Qtype_b)
+
+f2f_net <- f2f_enc %>% select(AbsRelbias, MN, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, SpecialPop, Qtype_b)
+
+mail_net <- mail_enc %>% select(AbsRelbias, MN, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, SpecialPop, Qtype_b)
+
+web_net <- web_enc %>%  select(AbsRelbias, MN, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, SpecialPop, Qtype_b)
+
+tel_net <- tel_enc %>% select(AbsRelbias, MN, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, SpecialPop, Qtype_b)
+
+paper_net <- paper_enc %>% select(AbsRelbias, MN, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, SpecialPop, Qtype_b)
+```
+
+## Missing data 
+
+Missing values are visualised using the `gg_mice::plot_pattern` for the full data and the data split by mode. In all cases, most of the missing values are for `Reminder` and `Saliency`. Missing values are dealt with by casewise deletion as the `mgm` function cannot handle them. This can significantly reduce the sample size of the moed-specific and cause problems with estimation. To avoid this, mail and paper modes are combined as they have the greatest degree over overlap. 
+
+```{r, echo = FALSE, fig.show='hold', fig.cap="Pattern of missing data in all survey modes (left) and face-to-face mode (right)"}
+a<-ggmice::plot_pattern(data_net, rotate = TRUE, square = TRUE)
+b<-ggmice::plot_pattern(f2f_net, rotate = TRUE, square = TRUE)
+ggpubr::ggarrange(a,b, common.legend = TRUE)
+```
+
+```{r, echo=FALSE,fig.show='hold', fig.cap="Pattern of missing data in all mail (left) and web (right) survey modes"}
+c<-ggmice::plot_pattern(mail_net, rotate = TRUE, square = TRUE)
+d<-ggmice::plot_pattern(web_net, rotate = TRUE, square = TRUE)
+ggpubr::ggarrange(c,d, common.legend = TRUE)
+```
+
+```{r, echo=FALSE, fig.show='hold', fig.cap="Pattern of missing data in telephone (left) and paper drop survey modes (right)"}
+e<-ggmice::plot_pattern(tel_net, rotate = TRUE, square = TRUE)
+f<-ggmice::plot_pattern(paper_net, rotate = TRUE, square = TRUE)
+ggpubr::ggarrange(e,f, common.legend = TRUE)
+```
+
+```{r, echo=FALSE}
+# Combine paper and mail
+mail_net <- rbind(mail_net, paper_net)
+rm(paper_net)
+# Remove missing values
+is.na(data_net) <- sapply(data_net, is.infinite)
+is.na(f2f_net) <- sapply(f2f_net, is.infinite)
+is.na(mail_net) <- sapply(mail_net, is.infinite)
+is.na(web_net) <- sapply(web_net, is.infinite)
+is.na(tel_net) <- sapply(tel_net, is.infinite)
+
+data_net <- na.omit(data_net)
+f2f_net <- na.omit(f2f_net)
+mail_net <- na.omit(mail_net)
+web_net <- na.omit(web_net)
+tel_net <- na.omit(tel_net)
+```
+
+## MGM Parameters
+
+Below we create a list of the following:
+
+* `data`: a matrix of the data for estimation
+* `type`: a vector of length equal to the nodes in the network that identifies the node class (gaussian/continuous or multinomial/categorical). 
+* `levels`: a vector detailing the number of levels in each node (defaults to 1 for continuous variables).
+* `colnames`: to identify and label the nodes when visualising the network
+
+The `mgm` function requires this information to estimate the network. 
+
+```{r, include = TRUE, results='hide'}
+# Make type and level labels
+# type_all and level_all include the mode, to be used on data_net
+type_all <- c("g", "g", "g","c", "c", "c", "c", "c", "c", "c", "c")
+levels_all <- c(1, 1, 1, 2, 2, 2, 2, 2, 5, 2, 2)
+
+# type and levels do not include mode are for the split data
+type <- c("g", "g", "c", "c", "c", "c", "c", "c", "c")
+levels <- c(1, 1, 2, 2, 2, 2, 2, 2, 2)
+
+# Make a list of the data sets
+# all data
+data_net_list <- list(data = data_net, type = type_all, level = levels_all, colnames = colnames(data_net))
+# data split by modes
+f2f_net_list <- list(data = f2f_net, type = type, level = levels, colnames = colnames(f2f_net))
+web_net_list <- list(data = web_net, type = type, level = levels, colnames = colnames(web_net))
+mail_net_list <- list(data = mail_net, type = type, level = levels, colnames = colnames(mail_net))
+tel_net_list <- list(data = tel_net, type = type, level = levels, colnames = colnames(tel_net))
+
+# checks
+length(type_all)
+length(levels_all)
+length(data_net)
+
+length(f2f_net)
+length(levels)
+length(type)
+```
+
+### Network 1: Mode as a node
+
+In this network, mode is included as a node. It is expected that certain survey characteristics operate differently across different modes. Therefore, mode should be a highly central mode in the network. 
+
+```{r, echo = FALSE}
+set.seed(1)
+# Estimate the network
+mgm_all <- mgm(data = as.matrix(data_net_list$data), 
+               type = data_net_list$type,
+               level = data_net_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+
+# Bootstrap the stability of parameter estimates -- note this takes a while to run
+#net1_boot <- resample(object = mgm_all,
+                    #data = as.matrix(data_net_list$data),
+                    #nB = 1000)
+
+#saveRDS(net1_boot, "data/net1_boot.RDS")
+
+# Draw the network
+qgraph(input = mgm_all$pairwise$wadj,
+       layout = 'spring',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = data_net_list$colnames,
+       legend.cex=.45)
+
+net1_boot <- readRDS("data/net1_boot.RDS")
+
+# Plot the bootstrap estimates
+plotRes(object = net1_boot,
+        quantiles = c(.05, .95),
+        labels = NULL,
+        axis.ticks = c(-.25, 0, .25, .5, .75))
+```
+
+```{r, echo = FALSE, eval = FALSE}
+int12 <- showInteraction(mgm_all, int=c(1,2))
+
+#round(mgm_all$pairwise$wadj, 2)
+
+showInteraction(object = mgm_all, 
+                int = c(1,2))
+
+(.1883624+0.1638707)/2
+int12$parameters
+```
+
+### Network 2: Face-to-Face
+
+```{r}
+set.seed(1)
+# Estimate the network
+mgm_f2f <- mgm(data = as.matrix(f2f_net_list$data), 
+               type = f2f_net_list$type,
+               level = f2f_net_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+
+# Bootstrap the stability of parameter estimates -- note this takes a while to run
+#f2f_boot <- resample(object = mgm_f2f,
+                 #   data = as.matrix(f2f_net_list$data),
+                 #   nB = 1000)
+
+#saveRDS(net1_boot, "data/f2f_boot.RDS")
+
+# Draw the network
+qgraph(input = mgm_f2f$pairwise$wadj,
+       layout = 'spring',
+       edge.color = f2f_net_list$pairwise$edgecolor,
+       nodeNames = f2f_net_list$colnames,
+       legend.cex=.45)
+
+f2f_boot <- readRDS("data/f2f_boot.RDS")
+
+# Plot the bootstrap estimates
+plotRes(object = f2f_boot,
+        quantiles = c(.05, .95),
+        labels = NULL,
+        axis.ticks = c(-.25, 0, .25, .5, .75))
+```
+
+### Network 3: Web Mode
+
+```{r}
+set.seed(1)
+# Estimate the network
+mgm_web <- mgm(data = as.matrix(web_net_list$data), 
+               type = web_net_list$type,
+               level = web_net_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+
+# Bootstrap the stability of parameter estimates -- note this takes a while to run
+#web_boot <- resample(object = mgm_web,
+              #      data = as.matrix(web_net_list$data),
+              #      nB = 100)
+
+#saveRDS(web_boot, "data/web_boot.RDS")
+
+# Draw the network
+qgraph(input = mgm_web$pairwise$wadj,
+       layout = 'spring',
+       edge.color = mgm_web$pairwise$edgecolor,
+       nodeNames = web_net_list$colnames,
+       legend.cex=.45)
+
+web_boot <- readRDS("data/web_boot.RDS")
+
+# Plot the bootstrap estimates
+plotRes(object = web_boot,
+        quantiles = c(.05, .95),
+        labels = NULL,
+        axis.ticks = c(-.25, 0, .25, .5, .75))
+```
+
+### Network 4: Mail Mode
+
+```{r, echo = FALSE}
+set.seed(1)
+# Estimate the network
+mgm_mail <- mgm(data = as.matrix(mail_net_list$data), 
+               type = mail_net_list$type,
+               level = mail_net_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+
+# Bootstrap the stability of parameter estimates -- note this takes a while to run
+#mail_boot <- resample(object = mgm_mail,
+             #       data = as.matrix(mail_net_list$data),
+             #       nB = 100)
+
+#saveRDS(mail_boot, "data/mail_boot.RDS")
+
+# Draw the network
+qgraph(input = mgm_mail$pairwise$wadj,
+       layout = 'spring',
+       edge.color = mgm_mail$pairwise$edgecolor,
+       nodeNames = mail_net_list$colnames,
+       legend.cex=.45)
+
+mail_boot <- readRDS("data/mail_boot.RDS")
+
+# Plot the bootstrap estimates
+plotRes(object = mail_boot,
+        quantiles = c(.05, .95),
+        labels = NULL,
+        axis.ticks = c(-.25, 0, .25, .5, .75))
+```
+
+### Network 5: Telephone Mode
+
+```{r}
+set.seed(1)
+# Estimate the network
+mgm_tel <- mgm(data = as.matrix(tel_net_list$data), 
+               type = tel_net_list$type,
+               level = tel_net_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+# Bootstrap the stability of parameter estimates -- note this takes a while to run
+#tel_boot <- resample(object = mgm_tel,
+                 #   data = as.matrix(tel_net_list$data),
+                #    nB = 100)
+
+#saveRDS(tel_boot, "data/tel_boot.RDS")
+
+# Draw the network
+qgraph(input = mgm_tel$pairwise$wadj,
+       layout = 'spring',
+       edge.color = mgm_tel$pairwise$edgecolor,
+       nodeNames = tel_net_list$colnames,
+       legend.cex=.45)
+
+tel_boot <- readRDS("data/tel_boot.RDS")
+
+# Plot the bootstrap estimates
+plotRes(object = tel_boot,
+        quantiles = c(.05, .95),
+        labels = NULL,
+        axis.ticks = c(-.25, 0, .25, .5, .75))
+```
+
+### All networks
+
+```{r, echo = FALSE}
+qgraph(input = mgm_all$pairwise$wadj,
+       layout = 'spring',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = data_net_list$colnames,
+       legend.cex=.45)
+```
+
+```{r, echo = FALSE}
+#par(mfrow=c(2,2))
+layout(matrix(c(1, 1, 2, 3, 4, 5), 2, 3, byrow = T))
+
+qgraph(input = mgm_all$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = data_net_list$colnames,
+       legend.cex=.45)
+
+qgraph(input = mgm_f2f$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_mail$pairwise$edgecolor,
+       nodeNames = f2f_net_list$colnames,
+       legend.cex=.45)
+
+qgraph(input = mgm_web$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = web_net_list$colnames,
+       legend.cex=.45)
+
+qgraph(input = mgm_tel$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = tel_net_list$colnames,
+       legend.cex=.45)
+
+qgraph(input = mgm_mail$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_all$pairwise$edgecolor,
+       nodeNames = mail_net_list$colnames,
+       legend.cex=.45)
+```
+
+
+# Appendix
+
+```{r, echo = FALSE}
+library(kableExtra)
+
+# Create data.frame of pairwise interactions
+mgm_all_pairwise<- data.frame(mgm_all$pairwise$wadj, row.names = colnames(data_net))
+colnames(mgm_all_pairwise)<-names(data_net)
+
+mgm_all_nodewise<- data.frame(mgm_all$pairwise$wadjNodewise, row.names = colnames(data_net))
+colnames(mgm_all_nodewise)<-names(data_net)
+
+# f2f
+f2f_pairwise<- data.frame(mgm_f2f$pairwise$wadj, row.names = colnames(f2f_net))
+colnames(f2f_pairwise)<-names(f2f_net)
+
+f2f_nodewise<- data.frame(mgm_f2f$pairwise$wadjNodewise, row.names = colnames(f2f_net))
+colnames(f2f_pairwise)<-names(f2f_net)
+
+# web
+web_pairwise<- data.frame(mgm_web$pairwise$wadj, row.names = colnames(web_net))
+colnames(web_pairwise)<-names(web_net)
+
+web_nodewise<- data.frame(mgm_web$pairwise$wadjNodewise, row.names = colnames(web_net))
+colnames(web_nodewise)<-names(web_net)
+
+# mail
+mail_pairwise<- data.frame(mgm_mail$pairwise$wadj, row.names = colnames(mail_net))
+colnames(mail_pairwise)<-names(mail_net)
+
+mail_nodewise<- data.frame(mgm_mail$pairwise$wadjNodewise, row.names = colnames(mail_net))
+colnames(mail_pairwise)<-names(mail_net)
+
+# mail
+tel_pairwise<- data.frame(mgm_tel$pairwise$wadj, row.names = colnames(tel_net))
+colnames(tel_pairwise)<-names(tel_net)
+
+tel_nodewise<- data.frame(mgm_tel$pairwise$wadjNodewise, row.names = colnames(tel_net))
+colnames(tel_pairwise)<-names(tel_net)
+```
+
+
+
+## Network 1: Weighted and nodewise edge weights
+
+```{r, echo=FALSE}
+mgm_all_pairwise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Avereaged Interactions") %>% 
+  kable_classic(latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+
+mgm_all_nodewise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Nodewise Interactions") %>% 
+  kable_classic(position = "left",
+                latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+## Network F2F: Weighted and nodewise edge weights
+
+```{r, echo=FALSE}
+f2f_pairwise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Avereaged Interactions") %>% 
+  kable_classic(latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+
+f2f_nodewise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Nodewise Interactions") %>% 
+  kable_classic(position = "left",
+                latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+## Network Web: Weighted and nodewise edge weights
+
+```{r, echo=FALSE}
+web_pairwise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Avereaged Interactions") %>% 
+  kable_classic(latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+
+web_nodewise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Nodewise Interactions") %>% 
+  kable_classic(position = "left",
+                latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+## Network Mail: Weighted and nodewise edge weights
+
+```{r, echo=FALSE}
+mail_pairwise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Avereaged Interactions") %>% 
+  kable_classic(latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+
+mail_nodewise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Nodewise Interactions") %>% 
+  kable_classic(position = "left",
+                latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+## Network Telephone: Weighted and nodewise edge weights
+
+```{r, echo=FALSE}
+tel_pairwise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Avereaged Interactions") %>% 
+  kable_classic(latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+
+tel_nodewise %>% 
+  kbl(digits = 3,
+      align = "l",
+      booktabs = TRUE,
+      linesep = "",
+      caption = "Nodewise Interactions") %>% 
+  kable_classic(position = "left",
+                latex_options = "HOLD_position",
+                full_width = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+```{r}
+options(scipen=999)
+library(corrplot)
+library(lsr)
+
+corrplot(cor(na.omit(f2f_net)), method = "circle", type= "upper", diag = FALSE, tl.col = "black")
+
+ltm::biserial.cor(f2f_net$AbsRelbias, f2f_net$Saliency, use = c("all.obs"), level = 2)
+cor.test(f2f_net$AbsRelbias, f2f_net$Saliency)
+cor.test(f2f_net$MN, f2f_net$Saliency)
+
+lsr::cramersV(f2f_net)
+
+cv.test = function(x,y) {
+  CV = sqrt(chisq.test(x, y, correct=FALSE)$statistic /
+    (length(x) * (min(length(unique(x)),length(unique(y))) - 1)))
+  print.noquote("Cramér V / Phi:")
+  return(as.numeric(CV))
+}
+
+cv.test(f2f_net$Incentivised, f2f_net$Saliency)
+```
+

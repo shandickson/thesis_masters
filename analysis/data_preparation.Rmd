@@ -1,0 +1,336 @@
+---
+title: "Cleaning and preparation"
+author: "Shannon Dickson"
+date: "`r format(Sys.Date(), '%B %d %Y')`"
+output: 
+   bookdown::html_document2:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: false
+    code_folding: hide
+    theme: paper
+---
+
+<style type="text/css">
+  
+body{ /* Normal  */
+  font-size: 12px;
+  }
+td {  /* Table  */
+  font-size: 12px;
+}
+h1.title {
+  font-size: 18px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 18px;
+}
+h2 { /* Header 2 */
+  font-size: 18px;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+}
+code.r{ /* Code block */
+  font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+  font-size: 14px;
+}
+</style>
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo      = FALSE,
+    message   = FALSE,
+    warning   = FALSE,
+    fig.pos   = "H",
+    out.extra = ""
+)
+```
+
+**Purpose**: Cleaning the data and preparing it for the `mgm` package.
+**Contributions**: Thanks to Professor Peter Lugtig et al. for providing the dataset. 
+
+```{r, include=FALSE}
+library(dplyr)
+library(magrittr)
+library(stringr)
+library(forcats)
+source("functions.R")
+```
+
+Load the data:
+
+```{r, echo=F}
+data <- readRDS("data/input/nonresponse_database.RDS")
+```
+
+Select the main variables that I am interested in:
+
+```{r, echo=F}
+data <- data %>% select(ID, Article, StatsID, Author, Year, CountryData, DataCollDays, MaxNCAttempts, LenghthMin, NQuestions, Prenotification,
+                        Sponsorship, Incentiveamount, Reminder, Nreminder, ModeA, ModeB, Topic, TopicSalien, Incentives, Qtype, PopType, Urbanicity,
+                        StatsType, StatsRelevance, SSizeRBias, SSizeRR, Source, RR, MN, AbsRelbias, Truth, Respondents, Nonrespondents, Groves,
+                        Specialpop, SSize, meanNRbias)
+
+# Remove annoying grouping variable.
+data <- data[-1] 
+```
+
+Apply the `cleanup` function that I custom created:
+
+```{r, echo=F}
+data <- cleanup(data, exclude = "Groves")
+
+# Make Groves a factor.
+data$Groves <- as.factor(data$Groves)
+```
+
+Some manipulation is easier to do in a semi-manual way. Below I use the `forcats` package to recode factor variables to be more consistent with the metacode book. 
+
+The variable `Prenotification` is mostly coded as integer but we want the corresponding factor labels for the initial stage of the analysis (i.e. for creating descriptive statistics).
+
+Note that `Prenotification` subcategorises different methods of prenotifying survey respondents. There are some studies for which we do not know this information, but we do know if prenotification was used or not - these are coded "Yes" or "No". 
+
+```{r, echo=F}
+data <- data %>% mutate(Prenotified_type = fct_recode(Prenotification,  "Postcard" = "1",
+                                                                        "Letter"   = "2",
+                                                                        "Email"    = "3",
+                                                                        "Verbal"   = "4",
+                                                                        "Campaign" = "5",
+                                                                        "No"       = "6",
+                                                                        "Yes"      = "7",
+                                                                        "Phone"    = "8",
+                                                                        NULL       = "28",
+                                                                        NULL       = "No info"))
+```
+
+Below we again recode `Prenotification` but this time to a binary indicator. 
+
+```{r, echo=F}
+data <- data %>% mutate(Prenotification = fct_recode(Prenotification, "Yes" = "1",
+                                                                      "Yes" = "2",
+                                                                      "Yes" = "3",
+                                                                      "Yes" = "4",
+                                                                      "Yes" = "5",
+                                                                      "No"  = "6",
+                                                                      "Yes" = "7",
+                                                                      "Yes" = "8",
+                                                                      "Yes" = "Letter",
+                                                                      "Yes" = "Phone",
+                                                                      NULL  = "28",
+                                                                      NULL  = "No info"))
+```
+
+Below we recode `Sponsorship` to a binary indicator representing if the survey did or did not have sponsorship. 
+
+```{r, echo=F}
+data <- data %>% mutate(Sponsorship = fct_recode(Sponsorship, "Yes" = "Employer",
+                                                              "Yes" = "Government survey agency",
+                                                              "Yes" = "Hospital",
+                                                              "Yes" = "Market Research",
+                                                              "Yes" = "Other government agency",
+                                                              "Yes" = "Private survey company",
+                                                              "Yes" = "Professional group/club",
+                                                              "Yes" = "Service provider",
+                                                              "Yes" = "Service Provider",
+                                                              "Yes" = "State or local authority",
+                                                              "Yes" = "University",
+                                                              "No"  = "No info",
+                                                              NULL  = "45",
+                                                              NULL  = "48"))
+```
+
+Below we recode `Country` in a more consistent way. For example, "England' and "Wales" both become "UK".
+
+```{r, echo=F}
+data <- data %>% mutate(Country = fct_recode(CountryData,     "UK"  = "United Kingdom",
+                                                              "UK"  = "England",
+                                                              "UK"  = "Wales",
+                                                              "USA" = "United States",
+                                                              "Netherlands" = "The Netherlands"))
+```
+
+Below we recode `Topic` so that the remaining factor levels are either "Health" or "Other". Ideally, we would include a broader range of survey topics, but this reduces the sample size within the variable and would likely lead to estimation problems for `mgm`. Additionally, health related surveys are likely to appeal to respondents in a different way that other surveys that are more adjacend to the responder. People responding to health surveys are likely to have a specific health problem and thus interest, compared to those responding to less specialised surveys such as consumer or travel surveys. 
+
+```{r}
+data <- data %>% mutate(Topic = fct_recode(Topic, "Voting" = "voting", NULL = "13"))
+```
+
+```{r, echo=F}
+data <- data %>% mutate(Topic_Health = fct_recode(Topic, "Other" = "Consumer satisfaction",
+                                                         "Other" = "Crime",
+                                                         "Other" = "Education",
+                                                         "Other" = "Finances",
+                                                         "Other" = "General attitudes",
+                                                         "Other" = "Living",
+                                                         "Other" = "Omnibus",
+                                                         "Other" = "Parenthood",
+                                                         "Other" = "Safety",
+                                                         "Other" = "Special interests",
+                                                         "Other" = "Travel",
+                                                         "Other" = "Voting",
+                                                         "Other" = "Employment",
+                                                          NULL   = "13"))
+```
+
+Below we recode a shorter version of the `Topic` variable, for descriptive purposes. 
+
+```{r, echo=F}
+data <- data %>% mutate(Topic_Short = fct_recode(Topic, "Other" = "Crime",
+                                                        "Other" = "Education",
+                                                        "Other" = "Finances",
+                                                        "Other" = "Living",
+                                                        "Other" = "Omnibus",
+                                                        "Other" = "Parenthood",
+                                                        "Other" = "Safety",
+                                                        "Other" = "Special interests",
+                                                        "Other" = "Travel",
+                                                        "Other" = "Voting",
+                                                        NULL    = "13"))
+```
+
+Below we recode the primary `Mode` to be cleaner. 
+
+```{r, echo=F}
+data <- data %>% mutate(Mode = fct_recode(ModeA, "Paper drop" = "Drop off (paper)"))
+```
+
+We do the same for `Source`.
+
+```{r, echo=F}
+data <- data %>% mutate(Source = fct_recode(Source, "Intention to respond" = "Intentions to respond"))
+```
+
+The `Saliency` of the survey topic is recoded to be cleaner. 
+
+```{r, echo=F}
+data <- data %>% mutate(Saliency = fct_recode(TopicSalien, "No"  = "N/A (omnibus)",
+                                                           "Yes" = "Yes for some respondents",
+                                                           NULL  = "Undetermined"))
+```
+
+The variable `Urban` is recoded to be cleaner. 
+
+```{r, echo=F}
+data <- data %>% mutate(Urban = fct_recode(Urbanicity, "Urban" = "1",
+                                                       "Urban" = "Urban sample",
+                                                       "Mixed" = "3",
+                                                       "Rural" = "Rural sample. 3. Mixed",
+                                                        NULL   = "No info",
+                                                        NULL   = "0"))
+```
+
+
+The variable `PopType` (population type) is recoded to be cleaner. 
+
+```{r, echo=F}
+data <- data %>% mutate(Population = fct_recode(PopType, "Hospital patients" = "Hopital patients",
+                                                         "Interest Group"    = "Interest group/club/subscribers",
+                                                         "Consumer"          = "Consumers/service recipients"))
+```
+
+Some NULL values are recoded for the variable `Reminder`.
+
+```{r, echo=F}
+data <- data %>% mutate(Reminder = fct_recode(Reminder, "Undetermined" = "No info"))
+```
+
+Some NULL values are recoded for the variable `Incentives`.
+
+```{r, echo=F}
+data <- data %>% mutate(Incentives = fct_recode(Incentives, NULL = "3",  NULL = "712"))
+```
+
+A variable `Incentivised` is created that is a binary indicator of whether an incentive was offered or not. The motivation is that we do not have enough numbers within each type of incentive for reliable analysis. Different incentives may operate differently in terms of response rates and bias, but we ignore that possibility here. 
+
+```{r, echo=F}
+data <- data %>% mutate(Incentivised = fct_recode(Incentives, "Yes" = "Cash after",
+                                                              "Yes" = "Cash prior",
+                                                              "Yes" = "Gift cert after",
+                                                              "Yes" = "Gift certificate",
+                                                              "Yes" = "Lottery results at the end",
+                                                              "Yes" = "Lottery results known if won",
+                                                              "Yes" = "Token prior",
+                                                              "Yes" = "Yes for some respondents",
+                                                              "Yes" = "Yes no specifics",
+                                                              "No"  = "No info"))
+```
+
+A variable `QType_b` is created that indicates if a question relates to an observable on unobservable characteristic of the sampled person.
+
+```{r, eval = F}
+#data <- data %>% mutate(Qtype_b = fct_recode(Qtype, "Demographic" = "Observable"))
+```
+
+The `special_populaiton` variable is created indicating if a sample person belongs to a special population or not. 
+
+```{r, echo=F}
+data <- data %>% mutate(special_population = fct_recode(Specialpop, "Yes" = "yes", "No" = "no"))
+```
+
+Some factors need to be manually relevelled so that recoding performs consistently later. 
+
+```{r, echo=F}
+changes <- c("Prenotification", "Sponsorship", "Reminder", "Saliency", "Incentivised")
+data <- data %>% mutate(across(all_of(changes), ~ fct_relevel(.x, "No", "Yes")))
+lapply(data[changes], levels)
+```
+
+Deselect old variable we no longer need. 
+
+```{r, echo=F}
+data <- data %>% select(-c(ModeA, TopicSalien, CountryData, Urbanicity, Specialpop))
+```
+
+Impute missingness:
+
+```{r, echo=F}
+
+```
+
+Later, we will perform analysis on each type of survey mode. To make this easier, we create separate dataframes for this purpose now. 
+
+```{r, echo=F}
+data_f2f   <- data %>% filter(Mode == "F2F")
+data_mail  <- data %>% filter(Mode == "Mail")
+data_web   <- data %>% filter(Mode == "Web")
+data_tel   <- data %>% filter(Mode == "Telephone")
+data_paper <- data %>% filter(Mode == "Paper drop")
+```
+
+Here we use my custom created function `map_values` to recode factors to integer for `mgm`. 
+
+```{r, echo=F}
+data_coded  <- map_values(data, exclude       = c("ID", "Author", "Groves"), remove_levels = TRUE)
+f2f_coded   <- map_values(data_f2f, exclude   = c("ID", "Author", "Groves"), remove_levels = TRUE)
+web_coded   <- map_values(data_web, exclude   = c("ID", "Author", "Groves"), remove_levels = TRUE)
+mail_coded  <- map_values(data_mail, exclude  = c("ID", "Author", "Groves"), remove_levels = TRUE)
+paper_coded <- map_values(data_paper, exclude = c("ID", "Author", "Groves"), remove_levels = TRUE)
+tel_coded   <- map_values(data_tel, exclude   = c("ID", "Author", "Groves"), remove_levels = TRUE)
+```
+
+Save the full data and mode data, coded and uncoded versions.
+
+```{r, echo=F}
+saveRDS(data,       "data/input/data.RDS")
+saveRDS(data_coded, "data/input/data_coded.RDS")
+
+saveRDS(data_f2f,   "data/input/data_f2f.RDS")
+saveRDS(data_mail,  "data/input/data_mail.RDS")
+saveRDS(data_web,   "data/input/data_web.RDS")
+saveRDS(data_tel,   "data/input/data_tel.RDS")
+saveRDS(data_paper, "data/input/data_paper.RDS")
+
+saveRDS(f2f_coded,   "data/input/f2f_coded.RDS")
+saveRDS(mail_coded,  "data/input/mail_coded.RDS")
+saveRDS(web_coded,   "data/input/web_coded.RDS")
+saveRDS(tel_coded,   "data/input/tel_coded.RDS")
+saveRDS(paper_coded, "data/input/paper_coded.RDS")
+```
+

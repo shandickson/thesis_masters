@@ -1,0 +1,862 @@
+---
+title: "Network Models"
+author: "Shannon Dickson"
+date: "`r format(Sys.Date(), '%B %d %Y')`"
+output: 
+   bookdown::html_document2:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: false
+    code_folding: hide
+    theme: paper
+---
+
+<style type="text/css">
+  
+body{ /* Normal  */
+  font-size: 12px;
+  }
+td {  /* Table  */
+  font-size: 12px;
+}
+h1.title {
+  font-size: 18px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 18px;
+}
+h2 { /* Header 2 */
+  font-size: 18px;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+}
+code.r{ /* Code block */
+  font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+  font-size: 14px;
+}
+</style>
+
+---
+
+**Purpose:** I perform Mixed Graphical Modelling on the survey data. 
+
+```{r setup, echo = FALSE}
+library(knitr)
+knitr::opts_chunk$set(message = FALSE, 
+                      warning = FALSE)
+```
+
+# Introduction and Set-Up
+
+```{r, echo = FALSE}
+# Packages:
+library(mgm)
+library(qgraph)
+library(devtools)
+library(tidyverse)
+library(kableExtra)
+# Data:
+data        <- readRDS("data/input/data_coded.RDS")
+f2f_coded   <- readRDS("data/input/f2f_coded.RDS")
+mail_coded  <- readRDS("data/input/mail_coded.RDS")
+web_coded   <- readRDS("data/input/web_coded.RDS")
+tel_coded   <- readRDS("data/input/tel_coded.RDS")
+paper_coded <- readRDS("data/input/paper_coded.RDS")
+mail_coded  <- rbind(mail_coded, paper_coded)
+
+# Remove attributes:
+data[]       <- lapply(data,       function(x) { attributes(x) <- NULL; x })
+f2f_coded[]  <- lapply(f2f_coded,  function(x) { attributes(x) <- NULL; x })
+mail_coded[] <- lapply(mail_coded, function(x) { attributes(x) <- NULL; x })
+web_coded[]  <- lapply(web_coded,  function(x) { attributes(x) <- NULL; x })
+tel_coded[]  <- lapply(tel_coded,  function(x) { attributes(x) <- NULL; x })
+```
+
+Since `mgm` can only accept categorical variables coded as integer or numerical, I create a code-key to help understand the different levels. 
+
+```{r, echo = FALSE}
+# Create a code-key for the variables:
+data_key <- data.frame("Variable" = c("Absolute Relative Bias",
+                                      "Nonresponse Rate",
+                                      "Year",
+                                      "Mode",
+                                      "Question Type",
+                                      "Reminder",
+                                      "Topic",
+                                      "Population",
+                                      "Saliency",
+                                      "Incentives",
+                                      "Sponsorship"),
+                       
+                       "Key"      = c("Numerical",
+                                      "Numerical",
+                                      "N/A",
+                                      "0 = Paper;       1 = F2F;        2 = Mail;   3 = Telephone; 4 = Web",
+                                      "0 = Demographic; 1 = Observable; 2 = Unobservable",
+                                      "0 = No;          1 = Yes;        2 = Undetermined", 
+                                      "0 = Other;       1 = Health",
+                                      "0 = No;          1 = Yes",
+                                      "0 = No;          1 = Yes",
+                                      "0 = No;          1 = Yes",
+                                      "0 = No;          1 = Yes"
+                                      ))
+# Display the key in a nice table:
+data_key %>% 
+  kbl(caption = "Information on how variables are coded") %>% 
+  kable_paper(bootstrap_options = "striped", full_width = TRUE) %>% 
+  column_spec(1, bold = TRUE) %>% 
+  row_spec(0, bold = TRUE)
+```
+
+# Missing data 
+
+`mgm` cannot handle missingness, so it is useful to get an overview of missingness in the data. 
+
+```{r, echo = FALSE}
+# Take a look at missingness:
+data %>%
+  select(everything()) %>%
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  pivot_longer(cols = ID:special_population, names_to = "Variable", values_to = "Missing observations (N)") %>% 
+  kbl(caption = "Missingness in the data") %>% 
+  kable_paper(bootstrap_options = c("striped", "responsive"),
+              full_width        = FALSE) %>% 
+  column_spec(1, bold = TRUE) %>% 
+  row_spec(0,    bold = TRUE)
+```
+
+Visualising the missingness is also informative. 
+
+```{r}
+# Get the relevant sub-selection:
+b <- f2f_coded   %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+c <- mail_coded  %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+d <- web_coded   %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype) 
+e <- tel_coded   %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype) 
+f <- paper_coded %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype) 
+
+# Look at the missingness:
+ggmice::plot_pattern(data, rotate = TRUE, square = TRUE)
+ggmice::plot_pattern(b, rotate = TRUE, square = TRUE)
+ggmice::plot_pattern(c, rotate = TRUE, square = TRUE)
+ggmice::plot_pattern(d, rotate = TRUE, square = TRUE)
+ggmice::plot_pattern(e, rotate = TRUE, square = TRUE)
+ggmice::plot_pattern(f, rotate = TRUE, square = TRUE)
+```
+
+# Selecting the network data:
+
+```{r, echo = FALSE}
+# Select the variables to be used in the network:
+data_net  <- data        %>%  select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype, Mode)
+
+f2f_net   <- f2f_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+
+mail_net  <- mail_coded  %>%  select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+
+web_net   <- web_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+
+tel_net   <- tel_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+
+paper_net <- paper_coded %>% select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+
+# Combine mail and paper surveys, because there are too few paper surveys:
+mail_net <- rbind(mail_net, paper_net)
+rm(paper_net)
+```
+
+```{r, echo = FALSE}
+# Check for missing and infinite values, and remove them:
+is.na(data_net) <- sapply(data_net, is.infinite)
+is.na(f2f_net)  <- sapply(f2f_net,  is.infinite)
+is.na(mail_net) <- sapply(mail_net, is.infinite)
+is.na(web_net)  <- sapply(web_net,  is.infinite)
+is.na(tel_net)  <- sapply(tel_net,  is.infinite)
+
+data_net <- na.omit(data_net)
+f2f_net  <- na.omit(f2f_net)
+mail_net <- na.omit(mail_net)
+web_net  <- na.omit(web_net)
+tel_net  <- na.omit(tel_net)
+```
+
+```{r, echo = FALSE, results = 'hide'}
+# Create a list indicating the type and number of levels for each variable in the network:
+# Type is "Gaussian" or "Categorical", "g" or "c":
+
+# For the overall network:
+type_all   <- c("g", "g", "c", "c", "c", "c", "c", "c", "c", "c", "c")
+levels_all <- c(1, 1, 5, 2, 2, 3, 2, 2, 2, 3, 5)
+# For the mode-specific networks:
+type   <- c("g", "g", "c", "c", "c", "c", "c", "c", "c", "c")
+levels <- c(1, 1, 5, 2, 2, 3, 2, 2, 2, 3)
+
+# Combine this information with the dataframes:
+data_net_list <- list(data = data_net, type = type_all, level = levels_all, colnames = colnames(data_net))
+f2f_net_list  <- list(data = f2f_net,  type = type,     level = levels,     colnames = colnames(f2f_net))
+web_net_list  <- list(data = web_net,  type = type,     level = levels,     colnames = colnames(web_net))
+mail_net_list <- list(data = mail_net, type = type,     level = levels,     colnames = colnames(mail_net))
+tel_net_list  <- list(data = tel_net,  type = type,     level = levels,     colnames = colnames(tel_net))
+
+# Quick check that everything is correct:
+length(type_all)
+length(levels_all)
+length(data_net)
+
+length(f2f_net)
+length(levels)
+length(type)
+```
+
+# Network Modelling
+
+I will estimate an overall network *and* a network for each mode, because we expect our outcomes (nonresponse rates and nonresponse bias) to behave differently over modes. There are two main ways to do this:
+
+1. Estimate an overall network to check that mode matters, then split the data by mode and estimate a network for each. Possibly conduct a NCT.
+2. Estimate a moderated MGM, where mode is selected as the moderator and 3-way interactions are estimated between mode and all other variables. 
+
+A simulation study suggested that moderated MGM perform better, so I will try this first. It will be important to estimate bootstrapped stability of the network parameters for both methods and make a comparison.  
+
+## Moderated MGM
+
+Estimation is the same, but I specify the moderating variable `Mode` which is variable 11. 
+
+```{r, echo = FALSE}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the moderated MGM:
+mgm_mod <- mgm(data       = as.matrix(data_net_list$data), 
+               type       = data_net_list$type,
+               level      = data_net_list$levels,
+               k          = 2,
+               moderators = 11,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE)
+
+# The condition function from mgm holds the moderator variable and levels constant,
+# and estimates a network based on the specified level:
+
+# Condition 0 estimates a network where the moderator is Mode == Paper:
+cond0 <- condition(object = mgm_mod, 
+                   values = list('11' = 0))
+# Condition 1 estimates a network where the moderator is Mode == F2F:
+cond1 <- condition(object = mgm_mod, 
+                   values = list('11' = 1))
+# Condition 2 estimates a network where the moderator is Mode == Mail:
+cond2 <- condition(object = mgm_mod, 
+                   values = list('11' = 2))
+# Condition 3 estimates a network where the moderator is Mode == Telephone:
+cond3 <- condition(object = mgm_mod, 
+                   values = list('11' = 3))
+# Condition 4 estimates a network where the moderator is Mode == Web:
+cond4 <- condition(object = mgm_mod, 
+                   values = list('11' = 4))
+
+# Create a list of the conditions, we will use for plotting:
+conditions <- list(cond0, cond1, cond2, cond3, cond4)
+
+# Set the max value to the maximum value within each network weighted adjacency matrix:
+max_val <- max(max(conditions[[1]]$pairwise$wadj),
+               max(conditions[[2]]$pairwise$wadj),
+               max(conditions[[3]]$pairwise$wadj),
+               max(conditions[[4]]$pairwise$wadj),
+               max(conditions[[5]]$pairwise$wadj))
+
+# Make nice node names:
+nice_colnames <- c("Absolute relative bias",
+                   "Nonresponse rate",
+                   "Source",
+                   "Saliency",
+                   "Incentivised",
+                   "Reminders",
+                   "Sponsorship",
+                   "Survey topic",
+                   "Special population",
+                   "Question type",
+                   "Mode")
+
+# Partition a plot space:                                    
+par(mfrow=c(3, 2))
+
+# Iterate over the conditions with qgraph:
+for(i in 1:5) qgraph(input               = conditions[[i]]$pairwise$wadj,
+                     layout              = "circle", 
+                     edge.color          = c("#273B5B", "#E48F1B", "grey90"),
+                     ruleReg             = "OR",
+                     lambdaSel           = 'EBIC', 
+                     lambdaGam           = 0.25,
+                     binarySign          = TRUE,
+                     maximum             = max_val,
+                     nodeNames           = nice_colnames,
+                     legend.cex          = 0.7,
+                     vsize               = 7,
+                     esize               = 10,
+                     #curveAll            = TRUE,
+                     #curveDefault        = 0.5,
+                     font                = 4,
+                     title               = paste0("Mode = ", c("Paper", "F2F", "Mail", "Telephone", "Web")[i]))
+                     #filetype       = "png",
+                     #filename       = paste0("img/mgm_mod_", c("Paper", "F2F", "Mail", "Telephone", "Web")[i]),
+                     #bg             = "transparent")
+```
+
+## Overall MGM
+
+```{r, echo = FALSE}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the overall network:
+mgm_all <- mgm(data       = as.matrix(data_net_list$data), 
+               type       = data_net_list$type,
+               level      = data_net_list$levels,
+               k          = 2,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE,
+               saveModels = TRUE)
+
+# Create predictions based on the network,
+# Categorical == nCC meaning correct classifications,
+# Continuous  == R2 meaning % explained variance:
+mgm_predict_all <- predict(object   = mgm_all,
+                           data     = data_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+# Take a look at the errors:
+mgm_predict_all$error
+
+# Create a neat list of the errors for all variable types,
+# Looping over the continuous and then the categorical errors.
+errors <- list()
+for(i in 1:2)  errors[[i]] <- mgm_predict_all$errors[i,2]
+for(i in 3:11) errors[[i]] <- mgm_predict_all$errors[i,3]
+
+# Do something similar where we store colours for the errors:
+colors <- list()
+colors <- list()
+for(i in 1:2)  colors[[i]] <- "#90B4D4"
+for(i in 3:11) colors[[i]] <- c("#FFA500", "#FF4300")
+
+# Network plot:
+qgraph(input       = mgm_all$pairwise$wadj,
+       layout      = 'circle',
+       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
+       nodeNames   = nice_colnames,
+       legend.cex  = 0.7,
+       pie         = errors, 
+       pieColor    = colors,
+       legend.cex  = 0.7,
+       vsize       = 7,
+       esize       = 10,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/mgm_all_preds",
+       bg          = "transparent")
+
+# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
+mgm_all_pairwise <- data.frame(mgm_all$pairwise$wadj,         row.names = colnames(data_net))
+mgm_all_nodewise <- data.frame(mgm_all$pairwise$wadjNodewise, row.names = colnames(data_net))
+# Add column names to the data frame:
+colnames(mgm_all_pairwise)<-names(data_net)
+colnames(mgm_all_nodewise)<-names(data_net)
+# Save the dataframes as RDS files:
+saveRDS(mgm_all_pairwise, "data/output/mgm_all_pairwise.RDS")
+saveRDS(mgm_all_nodewise, "data/output/mgm_all_nodewise.RDS")
+```
+
+## Face-to-Face MGM
+
+```{r, echo = FALSE}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the F2F network:
+mgm_f2f <- mgm(data       = as.matrix(f2f_net_list$data), 
+               type       = f2f_net_list$type,
+               level      = f2f_net_list$levels,
+               k          = 2,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE)
+
+
+# Create predictions based on the network,
+# Categorical == nCC meaning correct classifications,
+# Continuous  == R2 meaning % explained variance:
+mgm_predict_f2f <- predict(object   = mgm_f2f,
+                           data     = f2f_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+# Take a look at the errors:
+mgm_predict_f2f$error
+
+# Create a neat list of the errors for all variable types,
+# Looping over the continuous and then the categorical errors.
+errors <- list()
+for(i in 1:2)  errors[[i]] <- mgm_predict_f2f$errors[i,2]
+for(i in 3:10) errors[[i]] <- mgm_predict_f2f$errors[i,3]
+# Do something similar where we store colours for the errors:
+colors <- list()
+for(i in 1:2)  colors[[i]] <- "#90B4D4"
+for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
+# Network plot:
+qgraph(input       = mgm_f2f$pairwise$wadj,
+       layout      = 'circle',
+       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
+       nodeNames   = nice_colnames[1:10],
+       legend.cex  = 0.7,
+       pie         = errors, 
+       pieColor    = colors,
+       legend.cex  = 0.7,
+       vsize       = 7,
+       esize       = 10,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/mgm_f2f_preds",
+       bg          = "transparent")
+
+# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
+mgm_f2f_pairwise <- data.frame(mgm_f2f$pairwise$wadj,         row.names = colnames(f2f_net))
+mgm_f2f_nodewise <- data.frame(mgm_f2f$pairwise$wadjNodewise, row.names = colnames(f2f_net))
+# Add column names to the data frame:
+colnames(mgm_f2f_pairwise) <- names(f2f_net)
+colnames(mgm_f2f_nodewise) <- names(f2f_net)
+# Save the dataframes as RDS files:
+saveRDS(mgm_f2f_pairwise, "data/output/mgm_f2f_pairwise.RDS")
+saveRDS(mgm_f2f_nodewise, "data/output/mgm_f2f_nodewise.RDS")
+```
+
+## Web MGM
+
+```{r, echo = FALSE}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the web network:
+mgm_web <- mgm(data       = as.matrix(web_net_list$data), 
+               type       = web_net_list$type,
+               level      = web_net_list$levels,
+               k          = 2,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE)
+
+# Create predictions based on the network,
+# Categorical == nCC meaning correct classifications,
+# Continuous  == R2 meaning % explained variance:
+mgm_predict_web <- predict(object   = mgm_web,
+                           data     = web_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+# Take a look at the errors:
+mgm_predict_web$error
+
+# Create a neat list of the errors for all variable types,
+# Looping over the continuous and then the categorical errors:
+errors <- list()
+for(i in 1:2)  errors[[i]] <- mgm_predict_web$errors[i,2]
+for(i in 3:10) errors[[i]] <- mgm_predict_web$errors[i,3]
+# Do something similar where we store colours for the errors:
+colors <- list()
+for(i in 1:2)  colors[[i]] <- "#90B4D4"
+for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
+
+# Network plot:
+qgraph(input       = mgm_web$pairwise$wadj,
+       layout      = 'circle',
+       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
+       nodeNames   = nice_colnames[1:10],
+       legend.cex  = 0.7,
+       pie         = errors, 
+       pieColor    = colors,
+       legend.cex  = 0.7,
+       vsize       = 7,
+       esize       = 10,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/mgm_web_preds",
+       bg          = "transparent")
+
+# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
+mgm_web_pairwise <- data.frame(mgm_web$pairwise$wadj,         row.names = colnames(web_net))
+mgm_web_nodewise <- data.frame(mgm_web$pairwise$wadjNodewise, row.names = colnames(web_net))
+# Add column names to the data frame:
+colnames(mgm_web_pairwise) <- names(web_net)
+colnames(mgm_web_nodewise) <- names(web_net)
+# Save the dataframes as RDS files:
+saveRDS(mgm_web_pairwise, "data/output/mgm_web_pairwise.RDS")
+saveRDS(mgm_web_nodewise, "data/output/mgm_web_nodewise.RDS")
+```
+
+## Mail MGM
+
+```{r, echo = FALSE}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the mail network:
+mgm_mail <- mgm(data      = as.matrix(mail_net_list$data), 
+               type       = mail_net_list$type,
+               level      = mail_net_list$levels,
+               k          = 2,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE)
+
+
+# Create predictions based on the network,
+# Categorical == nCC meaning correct classifications,
+# Continuous  == R2 meaning % explained variance:
+mgm_predict_mail <- predict(object   = mgm_mail,
+                            data     = mail_net_list$data, 
+                            errorCat = 'nCC',
+                            errorCon = 'R2')
+# Take a look at the errors:
+mgm_predict_mail$error
+
+# Create a neat list of the errors for all variable types,
+# Looping over the continuous and then the categorical errors:
+errors <- list()
+for(i in 1:2)  errors[[i]] <- mgm_predict_mail$errors[i,2]
+for(i in 3:10) errors[[i]] <- mgm_predict_mail$errors[i,3]
+# Do something similar where we store colours for the errors:
+colors <- list()
+for(i in 1:2)  colors[[i]] <- "#90B4D4"
+for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
+
+# Network plot:
+qgraph(input       = mgm_mail$pairwise$wadj,
+       layout      = 'circle',
+       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
+       nodeNames   = nice_colnames[1:10],
+       legend.cex  = 0.7,
+       pie         = errors, 
+       pieColor    = colors,
+       legend.cex  = 0.7,
+       vsize       = 7,
+       esize       = 10,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/mgm_mail_preds",
+       bg          = "transparent")
+
+# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
+mgm_mail_pairwise <- data.frame(mgm_mail$pairwise$wadj,         row.names = colnames(mail_net))
+mgm_mail_nodewise <- data.frame(mgm_mail$pairwise$wadjNodewise, row.names = colnames(mail_net))
+# Add column names to the data frame:
+colnames(mgm_mail_pairwise) <- names(mail_net)
+colnames(mgm_mail_nodewise) <- names(mail_net)
+# Save the dataframes as RDS files:
+saveRDS(mgm_mail_pairwise, "data/output/mgm_mail_pairwise.RDS")
+saveRDS(mgm_mail_nodewise, "data/output/mgm_mail_nodewise.RDS")
+```
+
+## Telephone MGM
+
+```{r}
+# Set a seed for reproducibility:
+set.seed(123)
+# Estimate the telephone network:
+mgm_tel <- mgm(data       = as.matrix(tel_net_list$data), 
+               type       = tel_net_list$type,
+               level      = tel_net_list$levels,
+               k          = 2,
+               lambdaSel  = 'EBIC', 
+               lambdaGam  = 0.25,
+               ruleReg    = "OR",
+               binarySign = TRUE,
+               scale      = TRUE, 
+               pbar       = FALSE)
+
+# Create predictions based on the network,
+# Categorical == nCC meaning correct classifications,
+# Continuous  == R2 meaning % explained variance:
+mgm_predict_tel <- predict(object   = mgm_tel,
+                           data     = tel_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+# Take a look at the errors:
+mgm_predict_tel$error
+
+# Create a neat list of the errors for all variable types,
+# Looping over the continuous and then the categorical errors:
+errors <- list()
+for(i in 1:2)  errors[[i]] <- mgm_predict_tel$errors[i,2]
+for(i in 3:10) errors[[i]] <- mgm_predict_tel$errors[i,3]
+# Do something similar where we store colours for the errors:
+colors <- list()
+for(i in 1:2)  colors[[i]] <- "#90B4D4"
+for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
+
+# Network plot:
+qgraph(input       = mgm_tel$pairwise$wadj,
+       layout      = 'circle',
+       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
+       nodeNames   = nice_colnames[1:10],
+       legend.cex  = 0.7,
+       pie         = errors, 
+       pieColor    = colors,
+       legend.cex  = 0.7,
+       vsize       = 7,
+       esize       = 10,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/mgm_tel_preds",
+       bg          = "transparent")
+
+# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
+mgm_tel_pairwise <- data.frame(mgm_tel$pairwise$wadj,         row.names = colnames(tel_net))
+mgm_tel_nodewise <- data.frame(mgm_tel$pairwise$wadjNodewise, row.names = colnames(tel_net))
+# Add column names to the data frame:
+colnames(mgm_tel_pairwise) <- names(tel_net)
+colnames(mgm_tel_nodewise) <- names(tel_net)
+# Save the dataframes as RDS files:
+saveRDS(mgm_tel_pairwise, "data/output/mgm_tel_pairwise.RDS")
+saveRDS(mgm_tel_nodewise, "data/output/mgm_tel_nodewise.RDS")
+```
+
+# Network Centrality
+
+```{r, eval=F}
+# Use bootnet to estimate the network:
+overall_net_strength <- bootnet::estimateNetwork(data_net_list$data, type = data_net_list$type, levels = data_net_list$level, default = "mgm")
+f2f_net_strength     <- bootnet::estimateNetwork(f2f_net_list$data,  type = f2f_net_list$type,  levels = f2f_net_list$level,  default = "mgm")
+mail_net_strength    <- bootnet::estimateNetwork(mail_net_list$data, type = mail_net_list$type, levels = mail_net_list$level, default = "mgm")
+web_net_strength     <- bootnet::estimateNetwork(web_net_list$data,  type = web_net_list$type,  levels = web_net_list$level,  default = "mgm")
+tel_net_strength     <- bootnet::estimateNetwork(tel_net_list$data,  type = tel_net_list$type,  levels = tel_net_list$level,  default = "mgm")
+# Strength Centrality:
+centralityPlot(overall_net_strength, scale = "raw0", include = c("Strength"))
+centralityPlot(f2f_net_strength,     scale = "raw0", include = c("Strength"))
+centralityPlot(mail_net_strength,    scale = "raw0", include = c("Strength"))
+centralityPlot(web_net_strength,     scale = "raw0", include = c("Strength"))
+centralityPlot(tel_net_strength,     scale = "raw0", include = c("Strength"))
+```
+
+# Network Stability
+
+```{r, eval=F}
+
+```
+
+# Inspecting interactions
+
+## All modes
+
+```{r, eval=F}
+# Interactions - whole network
+## Bias (1) and NR (2)
+showInteraction(object = mgm_all, int = c(1, 2))$parameters
+
+## Bias (1) and question type (10)
+showInteraction(object = mgm_all, int = c(1, 10))$parameters
+
+## Bias (1) mode (11)
+showInteraction(object = mgm_all, int = c(1, 11))$parameters
+
+## Modes (11) and NR (2)
+showInteraction(object = mgm_all, int = c(2, 11))$parameters
+
+## Modes (11) and Year (3)
+showInteraction(object = mgm_all, int = c(11, 3))$parameters
+
+## Modes (11) and Saliency (4)
+showInteraction(object = mgm_all, int = c(11, 4))$parameters
+
+## Modes (11) and Incentive (5)
+showInteraction(object = mgm_all, int = c(11, 5))$parameters
+
+## Modes (11) and Reminder (6)
+showInteraction(object = mgm_all, int = c(11, 6))$parameters
+
+## Modes (11) and Sponsorship (7)
+showInteraction(object = mgm_all, int = c(11, 7))$parameters
+
+## Modes (11) and topic (8)
+showInteraction(object = mgm_all, int = c(11, 8))$parameters
+
+## Modes (11) and special population (9)
+showInteraction(object = mgm_all, int = c(11, 9))$parameters
+
+## Modes (11) and question type (10)
+showInteraction(object = mgm_all, int = c(11, 10))$parameters
+
+showInteraction(object = mgm_all, int = c(2, 4))$parameters
+```
+
+* Estimating the MGM on the entire dataset that includes face-to-face, web, mail, and paper survey modes results in a very dense network (**Figure 3**).
+* Of interest is the connections to nonresponse bias (1) and nonresponse rates (2). A positive edge between these two nodes is driven by a direct effect of nonresponse rates on nonresponse bias. Specifically, a one unit increase in nonresponse rates leads to a 0.19 unit increase in nonresponse bias. Conversely, the regression in the opposite direction is estimated to be zero. 
+* Survey mode (11) is also connected to nonresponse bias (1) and nonresponse rate (2). Paper surveys are the reference category, relative to which nonresponse rates decrease for face-to-face (-1.23), mail (-0.34), and telephone (-0.47). Nonresponse rates for web surveys do not differ from paper surveys. Nonresponse bias only decreases for mail surveys relative to paper surveys (-0.04 ). 
+* The type of question asked is connected to nonresponse bias, whereby it decreases for unobservable characteristics relative to demographic characteristics
+* Nonresponse rates increase when surveys are fielded in special populations (0.46), when participants are incentivised (0.24), when surveys are salient (0.15). Conversely, nonresponse rates decreases for health surveys (-0.14), sponsored surveys (-0.34), when reminders are used (-0.12).
+
+Other 
+* Face-to-face and web surveys are less likely to be incentivised than mail, paper, and telephone surveys. 
+* Web surveys less salient. Mail surveys more salient. 
+* Telephone surveys more likely to be sponsored.
+* Face-to-face and paper more likely to be health surveys. 
+* Face-to-face and telephone surveys more likely to be fielded in special populations. 
+
+### F2F surveys
+
+```{r, eval=F}
+# Interactions - f2f network
+## Bias (1) and saliency (4)
+showInteraction(object = mgm_f2f, int = c(1, 4))$parameters
+
+## Bias (1) and incentive (5)
+showInteraction(object = mgm_f2f, int = c(1, 5))$parameters
+
+## Bias (1) and reminder (6)
+showInteraction(object = mgm_f2f, int = c(1, 6))$parameters
+
+## Bias (1) and topic (8)
+showInteraction(object = mgm_f2f, int = c(1, 8))$parameters
+
+## Bias (1) and question type (10)
+showInteraction(object = mgm_f2f, int = c(1, 10))$parameters
+
+## NR (2) and saliency (4)
+showInteraction(object = mgm_f2f, int = c(2, 4))$parameters
+
+## NR (2) and reminders (6)
+showInteraction(object = mgm_f2f, int = c(2, 6))$parameters
+
+## NR (2) and topic (8)
+showInteraction(object = mgm_f2f, int = c(2, 8))$parameters
+
+## NR (2) and special population (9)
+showInteraction(object = mgm_f2f, int = c(2, 9))$parameters
+
+## NR (2) and question type (20)
+showInteraction(object = mgm_f2f, int = c(2, 10))$parameters
+```
+
+* Estimating the MGM on face-to-face surveys also results in a very dense network (**Figure 4**).
+* Here, nonresponse bias is again connected to the type of question asked (note: question type is not predicting bias but as bias increases it is less likely to be a demographic question (-1.91).
+* Additionally, nonresponse bias decreases by -0.29 if the survey is salient, -0.42 if incentives are used, -0.10 for health surveys. Note: connection between bias and reminders indicates as bias increases more likely to be a survey where reminders are “undetermined” (0.85).
+* Nonresponse rates not connected to bias. 
+* Nonresponse rates are connected to question type (0.74 for observable), special populations (1.73), health surveys (1.03), reminders (2.70 for reminders and 0.86 for undetermined), saliency (-2.29).
+
+### Web surveys
+
+```{r, eval=F}
+# Interactions - web network
+## Bias (1) and reminders (6)
+showInteraction(object = mgm_web, int = c(1, 6))$parameters
+
+## Bias (1) and question type (10)
+showInteraction(object = mgm_web, int = c(1, 10))$parameters
+
+## NR (2) and saliency (4)
+showInteraction(object = mgm_web, int = c(2, 4))$parameters
+
+## NR (2) and incentives (5)
+showInteraction(object = mgm_web, int = c(2, 5))$parameters
+
+## NR (2) and reminders (6)
+showInteraction(object = mgm_web, int = c(2, 6))$parameters
+
+## NR (2) and topic (8)
+showInteraction(object = mgm_web, int = c(2, 8))$parameters
+
+## NR (2) and special population (9)
+showInteraction(object = mgm_web, int = c(2, 9))$parameters
+
+## NR (2) and question type (10)
+showInteraction(object = mgm_web, int = c(2, 10))$parameters
+```
+
+* Nonresponse rates and nonresponse bias not connected.
+* Nonresponse bias connected to question type (3.24 for observable) and reminders (0.29 for using reminders).
+* Nonresponse rates connected to question type (-1.32 observable, 0.34 unobservable), special populations (0.83), health surveys (0.35), reminders (0.85 for using reminders), incentives (1.75), saliency (0.65). 
+
+### Mail surveys
+
+```{r, eval=F}
+# Interactions - mail network
+## Bias (1) and nonresponse (2)
+showInteraction(object = mgm_mail, int = c(1, 2))$parameters
+
+## Bias (1) and reminders (6)
+showInteraction(object = mgm_mail, int = c(1, 6))$parameters
+
+## Bias (1) and question type (10)
+showInteraction(object = mgm_mail, int = c(1, 10))$parameters
+
+## NR (2) and year (3)
+showInteraction(object = mgm_mail, int = c(2, 3))$parameters
+
+## NR (2) and saliency (4)
+showInteraction(object = mgm_mail, int = c(2, 4))$parameters
+
+## NR (2) and incentives (5)
+showInteraction(object = mgm_mail, int = c(2, 5))$parameters
+
+## NR (2) and reminders (6)
+showInteraction(object = mgm_mail, int = c(2, 6))$parameters
+
+## NR (2) and sponsorship (7)
+showInteraction(object = mgm_mail, int = c(2, 7))$parameters
+
+## NR (2) and topic (8)
+showInteraction(object = mgm_mail, int = c(2, 8))$parameters
+
+## NR (2) and special population (9)
+showInteraction(object = mgm_mail, int = c(2, 9))$parameters
+
+## NR (2) and question type (10)
+showInteraction(object = mgm_mail, int = c(2, 10))$parameters
+```
+
+* Again, a very dense network. 
+* Nonresponse rates and nonresponse bias are connected, where a unit increase in nonresponse rates cause a 0.21 unit increase in nonresponse bias. 
+* Nonresponse bias is also connected to reminders and question type. As nonresponse bias increases, more likely to be surveys where reminders could not be determined. Similarly, as nonresponse bias increases, questions are more likely to be demographic (0.14) and less likely to be unobservable (-0.13).
+* Nonresponse rates are connected to question type (-0.37), special population (0.63), health surveys (-0.15), sponsorship (-0.35), reminders (-0.09 when used), incentives (0.22), saliency (0.19) and year (0.06). 
+
+
+### Telephone surveys
+
+```{r, eval=F}
+# Interactions - tel network
+
+## Bias (1) and reminders (6)
+showInteraction(object = mgm_tel, int = c(1, 6))$parameters
+
+## NR (2) and year (3)
+showInteraction(object = mgm_tel, int = c(2, 3))$parameters
+
+## NR (2) and reminders (6)
+showInteraction(object = mgm_tel, int = c(2, 6))$parameters
+
+## NR (2) and sponsorship (7)
+showInteraction(object = mgm_tel, int = c(2, 7))$parameters
+
+## NR (2) and topic (8)
+showInteraction(object = mgm_tel, int = c(2, 8))$parameters
+```
+
+* Only see a relationship with bias in surveys where reminders is "undetermined", where bias increases by 0.44.
+* When reminders are used nonresponse decreases by -0.67, when it is undetermiend nonresponse increases by 0.65.
+
+

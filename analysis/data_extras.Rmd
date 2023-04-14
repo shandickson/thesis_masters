@@ -1,0 +1,322 @@
+---
+title: "data_descriptives"
+author: "Shannon Dickson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+# import the libraries and the data: 
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(ggplot2)
+library(weights)
+library(jtools)
+library(ggpubr)
+library(kableExtra)
+
+data <- readRDS("data/data.RDS")
+```
+```{r}
+cor_old <- wtd.cor(x=data$MN[data$Groves==1], y=data$AbsRelbias[data$Groves==1])
+cor_new <- wtd.cor(x=data$MN[data$Groves==0], y=data$AbsRelbias[data$Groves==0])
+cor_all <- wtd.cor(x=data$MN, y=data$AbsRelbias)
+```
+
+
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+  drop_na(Mode) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Mode)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Mode) +
+  theme_bw()
+```
+
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+  drop_na(Topic_Short) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Topic_Short)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Topic_Short) +
+  theme_bw()
+```
+
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+  #drop_na(Saliency) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Saliency)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Saliency) +
+  theme_bw()
+```
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+  drop_na(Incentivised) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Incentivised)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Incentivised) +
+  theme_bw()
+```
+
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+ # drop_na(Reminder) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Reminder)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Reminder) +
+  theme_bw()
+```
+
+```{r}
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+data %>%
+  drop_na(Qtype) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Qtype)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Qtype) +
+  theme_bw()
+
+data %>%
+  drop_na(Qtype_b) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Qtype_b)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Qtype_b) +
+  theme_bw()
+```
+```{r}
+data %>%
+  drop_na(ModeB) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = as.factor(ModeB))) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~ModeB) +
+  theme_bw()
+```
+```{r}
+data %>%
+  drop_na(Sponsorship) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = as.factor(Sponsorship))) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Sponsorship) +
+  theme_bw()
+```
+```{r}
+data %>%
+  drop_na(special_populaiton) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = as.factor(special_populaiton))) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~special_populaiton) +
+  theme_bw()
+```
+
+```{r}
+data %>%
+  drop_na(Country) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Country)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+ # scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Country) +
+  theme_bw()
+```
+
+```{r}
+data %>%
+  drop_na(Source) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Source)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+ # scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Source) +
+  theme_bw()
+
+data %>%
+  drop_na(Source) %>% 
+  ggplot(aes(x = MN, y = AbsRelbias, colour = Source)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot()+
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+ #facet_wrap(~Source) +
+  theme_bw()
+
+data %>%
+  drop_na(Source) %>% 
+  ggplot(aes(AbsRelbias, colour = Source)) +
+  geom_jitter(alpha = 0.05) +
+  geom_boxplot()+
+  labs(x = "% Nonresponse Rate", 
+       y = "% Absolute Relative Bias") +
+ #facet_wrap(~Source) +
+  theme_bw()
+```
+```{r}
+data %>%
+  drop_na(Mode) %>% 
+  ggplot(aes(x = NQuestions, y = AbsRelbias, colour = Mode)) +
+  geom_jitter(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+ # scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "NQuestions", 
+       y = "% Absolute Relative Bias") +
+  facet_wrap(~Mode) +
+  theme_bw()
+
+data %>%
+  drop_na(Mode) %>% 
+  ggplot(aes(x = NQuestions, y = MN, colour = Mode)) +
+  geom_jitter(alpha = 0.3) +
+  geom_boxplot(alpha = 0.3) +
+ # geom_smooth(method = "lm", se = TRUE, color = "black") +
+ # scale_colour_manual(values = cbPalette, name = "") +
+  labs(x = "Number of Questions", 
+       y = "Nonresponse Bias") +
+ # facet_wrap(~Mode) +
+  theme_bw()
+```
+
+```{r}
+p1 <- data %>% 
+      ggplot(aes(MN, AbsRelbias, colour = Groves)) +
+      geom_jitter(alpha = 0.3) +
+      geom_smooth(method = "lm", se = TRUE) +
+      scale_colour_manual(values = c("#74A089", "#DC863B"), name = "", labels = c("New studies", "Groves")) +
+      labs(x = "Nonresponse Rate (%)",
+           y = "Absolute Relative Bias") +
+      theme_bw() +
+      theme(plot.title = element_text(element_blank()),
+            axis.title.x = element_text(face = "bold"),
+            axis.title.y = element_text(face = "bold"),
+            legend.position = "bottom",
+            panel.background = element_rect(fill = 'transparent'), 
+            plot.background = element_rect(fill = 'transparent', color=NA),
+            legend.background = element_rect(fill='transparent'),
+            legend.box.background = element_rect(fill='transparent')) +
+    annotate(geom = "text", x = 7.5, y = 130, label="(Old) weighted R = ", color = "#74A089", size = 3) +
+    annotate(geom = "text", x = 20, y = 130, label= round(cor_old[[1]],3), color = "#74A089", size = 3) +
+    annotate(geom = "text", x = 8, y = 125, label="(New) weighted R = ", color = "#DC863B", size = 3) +
+    annotate(geom = "text", x = 21, y = 125, label= round(cor_new[[1]],3), color = "#DC863B", size = 3)
+```
+
+```{r}
+dat <- data %>% select(c("Topic_Short", "Sponsorship", "Incentivised", "Reminder", "Mode", "Saliency", "Country", "special_populaiton", "Qtype"))
+imp <- mice::mice(dat, m=5, maxit=10, method="polyreg")
+
+plot(imp, layout = c(6, 6))
+
+longDF <- complete(imp, "long")
+
+lapply(imp$imp, function(x) 
+  summary(unlist(x))
+)
+```
+
+```{r}
+data_imp <- complete(imp)
+source("functions.R")
+data_imp_coded  <- map_values(data_imp, exclude       = c("ID", "Author", "Groves"), remove_levels = TRUE)
+
+imp$predictorMatrix
+```
+
+```{r}
+#data_imp_coded <- data_imp_coded %>% select(-Country)
+
+data_imp_coded <- cbind(data_imp_coded, data$MN, data$AbsRelbias)
+data_imp_coded <- data_imp_coded[-c(11:12)]
+
+is.na(data_imp_coded) <- sapply(data_imp_coded, is.infinite)
+data_imp_coded <- na.omit(data_imp_coded)
+
+t <- c("c", "c", "c", "c", "c", "c", "c", "c", "c", "g", "g")
+l <- c(5, 2, 2, 2, 5, 2, 15, 2, 3, 1, 1)
+
+data_imp_list <- list(data = data_imp_coded, type = t, level = l, colnames = colnames(data_imp_coded))
+
+```
+
+```{r}
+set.seed(123)
+mgm_imp <- mgm(data = as.matrix(data_imp_list$data), 
+               type = data_imp_list$type,
+               level = data_imp_list$levels,
+               k = 2,
+               lambdaSel = 'EBIC', 
+               lambdaGam = 0.25,
+               ruleReg = "AND",
+               binarySign = TRUE,
+               scale = TRUE, 
+               pbar = FALSE)
+
+qgraph(input = mgm_imp$pairwise$wadj,
+       layout = 'circle',
+       edge.color = mgm_imp$pairwise$edgecolor,
+       nodeNames = data_imp_list$colnames,
+       legend.cex=.45)
+```
+```{r}
+res_imp <- resample(object = mgm_imp, 
+                    data = as.matrix(data_imp_list$data), 
+                    nB = 10,
+                    pbar = TRUE)
+
+plotRes(res_imp)
+```
+
+

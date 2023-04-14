@@ -1,0 +1,395 @@
+---
+title: "Descriptives"
+author: "Shannon Dickson"
+date: "`r format(Sys.Date(), '%B %d %Y')`"
+output: 
+   bookdown::html_document2:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: false
+    code_folding: hide
+    theme: paper
+---
+
+<style type="text/css">
+  
+body{ /* Normal  */
+  font-size: 12px;
+  }
+td {  /* Table  */
+  font-size: 12px;
+}
+h1.title {
+  font-size: 18px;
+  color: DarkBlue;
+}
+h1 { /* Header 1 */
+  font-size: 18px;
+}
+h2 { /* Header 2 */
+  font-size: 18px;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+}
+code.r{ /* Code block */
+  font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+  font-size: 14px;
+}
+</style>
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo      = FALSE,
+    message   = FALSE,
+    warning   = FALSE,
+    fig.pos   = "H",
+    out.extra = ""
+)
+```
+
+# Introduction
+
+**Purpose**: Producing some descriptive statistics and visualisations for the thesis.\
+
+**Contributions**: Thanks to Professor Peter Lugtig et al. for providing the original dataset.\
+
+```{r, echo=F}
+# Libraries needed:
+library(kableExtra)
+library(tidyverse)
+library(gtsummary)
+library(ggplot2)
+library(jcolors)
+library(weights)
+library(jtools)
+library(ggpubr)
+library(ggsci)
+library(readr)
+# My own functions:
+source("functions.R")
+# Data:
+data <- readRDS("data/input/data.RDS")
+```
+
+# Descriptive Tables
+
+## Table 1. Survey Characteristics
+
+```{r, warning=F, }
+data %>%
+  select(Mode, Topic_Health, Qtype, special_population, Saliency, Incentivised, Reminder, Sponsorship) %>% 
+  tbl_summary(by           = Mode,
+              sort         = all_categorical() ~ "frequency",
+              statistic    = list(all_categorical() ~ "{n} ({p}%)"),
+              missing      = "ifany",
+              missing_text = "Unknown",
+              label        = list(vars(Topic_Health)       ~ "Topic",
+                                  vars(Qtype)              ~ "Question type",
+                                  vars(special_population) ~ "Special population",
+                                  vars(Saliency)           ~ "Saliency of topic",
+                                  vars(Incentivised)       ~ "Incentives given ",
+                                  vars(Reminder)           ~ "Reminders sent",
+                                  vars(Sponsorship)        ~ "Sponsored"
+                                  ),
+              type        = list(c(Topic_Health, Qtype, special_population, Saliency, Incentivised, Reminder, Sponsorship) ~ "categorical")) %>% 
+  
+  bold_labels() %>% 
+  add_n() %>% 
+  modify_header(label ~ "Survey Characteristic") %>% 
+  modify_spanning_header(c("stat_1", "stat_2", "stat_3", "stat_4", "stat_5") ~ "**Primary Survey Mode**") %>% 
+  modify_table_body(~.x %>% dplyr::mutate(stat_1 = ifelse(stat_1 == 0 | stat_1 == "0 (0%)", "-", stat_1),
+                                          stat_2 = ifelse(stat_2 == 0, "-", stat_2),
+                                          stat_3 = ifelse(stat_3 == 0, "-", stat_3),
+                                          stat_4 = ifelse(stat_4 == 0, "-", stat_4),
+                                          stat_5 = ifelse(stat_5 == 0, "-", stat_5))) %>% 
+  modify_footnote(everything() ~ NA) %>% 
+  as_kable_extra(booktabs = TRUE, longtable = TRUE, linesep = "") %>% 
+  kableExtra::kable_classic(position = "left", full_width = F) %>% 
+  row_spec(0, bold = TRUE) %>% 
+  row_spec(c(4,9,16,20,24,28), italic  = TRUE) %>% 
+  footnote(general_title = "Statistics:",
+           general       = "<i>% (n)</i>", escape = FALSE)
+```
+
+## Table 2. NR and NRB in Groves and Peytcheva (2008) vs New Studies
+
+```{r}
+t2_groves <- data %>% 
+              mutate(Groves = recode(Groves, "1" = "Groves",
+                                             "0" = "New studies")) %>% 
+              drop_na(Groves)  %>% 
+              group_by(Groves) %>% 
+              summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
+                        "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
+                        "N"                      = n()) %>% 
+             arrange(desc(N))
+
+saveRDS(t2_groves, "tables/t2_groves.RDS")
+#write_csv(t2_groves, "tables/t2_groves.csv")
+
+t2_groves %>% 
+  kbl(col.names = c("Studies", "Nonresponse Rate", "Absolute Relative Bias", "N"), 
+      digits    = 2,
+      align     = c("l", "c", "c"),
+      booktabs  = T,
+      linesep   = "",
+      caption   = "NR and NRB in the current meta-analysis compared to an earlier meta-analysis") %>% 
+  kable_classic(position      = "left",
+                latex_options = "HOLD_position",
+                full_width    = F) %>% 
+  column_spec(c(1, 2, 3), width = "12em") %>% 
+  column_spec(1, bold = T) %>% 
+  row_spec(0, bold    = T) %>% 
+  footnote(general    = "Nonresponse rate and absolute relative bias are expressed as a percentage.")
+```
+
+## Table 3. NR and NRB by Survey Mode
+
+```{r}
+t3_modes <- data %>% 
+             drop_na(Mode)  %>% 
+             group_by(Mode) %>% 
+             summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
+                       "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
+                       "N"                      = n()) %>% 
+             arrange(desc(N))
+
+saveRDS(t3_modes, "tables/t3_modes.RDS")
+#write_csv(t3_modes, "tables/t3_modes.csv")
+
+t3_modes %>% 
+  kbl(digits   = 2,
+      align    = c("l", "c", "c"),
+      booktabs = T,
+      linesep  = "",
+      caption  = "Nonresponse rates and absolute relative bias by survey mode") %>% 
+  kable_classic(position      = "left",
+                latex_options = "HOLD_position",
+                full_width    = F) %>% 
+  column_spec(c(1, 2, 3), width = "12em") %>% 
+  column_spec(1, bold = T) %>% 
+  row_spec(0, bold = T) %>% 
+  footnote(general = "Nonresponse rate and absolute relative bias are expressed as a percentage.")
+```
+
+## Table 4. NR and NRB by Country
+
+```{r}
+t4_country <- data %>% 
+               drop_na(Country) %>% 
+               group_by(Country) %>% 
+               summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
+                         "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
+                         "N"                      = n()) %>% 
+               arrange(desc(N))
+
+saveRDS(t4_country, "tables/t4_country.RDS")
+#write_csv(t4_country, "tables/t4_country.csv")
+
+t4_country %>% 
+  kbl(digits   = 2,
+      align    = c("l", "c", "c"),
+      booktabs = T,
+      linesep  = "",
+      caption  = "Nonresponse rates and absolute relative bias by country") %>% 
+  kable_classic(position      = "left",
+                latex_options = "HOLD_position",
+                full_width    = F) %>% 
+  column_spec(c(1, 2, 3), width = "12em") %>% 
+  column_spec(1, bold = T) %>% 
+  row_spec(0, bold = T) %>% 
+  footnote(general = "Nonresponse rate and absolute relative bias are expressed as a percentage.")    
+```
+
+## Table 5. NR and NRB by Information Source on Nonrespondents
+
+```{r}
+t5_source <- data %>% 
+              drop_na(Source) %>% 
+              group_by(Source) %>% 
+              summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
+                        "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
+                        "N"                      = n()) %>% 
+              arrange(desc(N))
+
+saveRDS(t5_source, "tables/t5_source.RDS")
+#write_csv(t5_source, "tables/t5_source.csv")
+
+t5_source %>% 
+  kbl(digits   = 2,
+      align    = c("l", "c", "c"),
+      booktabs = T,
+      linesep  = "",
+      caption  = "Nonresponse rates and absolute relative bias by source") %>% 
+  kable_classic(position      = "left",
+                latex_options = "HOLD_position",
+                full_width    = F) %>% 
+  column_spec(c(1, 2, 3), width = "12em") %>% 
+  column_spec(1, bold = T) %>% 
+  row_spec(0, bold = T) %>% 
+  footnote(general = "Nonresponse rate and absolute relative bias are expressed as a percentage.") 
+```
+
+# Descriptive Figure
+
+## Figure 1. Weighted Correlation of NR and NRB
+
+```{r}
+p1 <- data %>% 
+        ggplot(aes(MN, AbsRelbias, colour = Groves)) +
+        geom_jitter(alpha  = 0.5,  size   = 2, shape = 21) +
+        geom_smooth(method = "lm", se     = FALSE) +
+        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
+        scale_y_continuous(expand  = c(0, 0), limits = c(-2, 100)) +
+        labs(x     = "Nonresponse Rate (%)",
+             y     = "Absolute Relative Bias (%)") +
+        theme_nice() +
+        theme(
+              #axis.title.x = element_blank(),
+              panel.background  = element_rect(fill = 'transparent', color = NA), 
+              plot.background   = element_rect(fill = 'transparent', color = NA))
+
+ggsave('img/p3_nrb_cor.png', p1, bg = 'transparent')
+
+p2 <- data %>% 
+        ggplot(aes(MN, meanNRbias, colour = Groves)) + 
+        geom_jitter(alpha = 0.5, size = 2, shape = 21) +
+        geom_smooth(method = "lm", se = FALSE) +
+        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
+        scale_y_continuous(expand = c(0, 0), limits = c(-2, 100)) +
+        labs(x     = "Nonresponse Rate (%)",
+             y     = "Mean Absolute Relative Bias (%)") +
+        theme_nice() +
+        theme(
+              #axis.title.x = element_blank(),
+              panel.background  = element_rect(fill = 'transparent', color = NA), 
+              plot.background   = element_rect(fill = 'transparent', color = NA))
+
+ggsave('img/p4_nrb_wcor.png', p2, bg = 'transparent')
+
+p_cors <- ggarrange(p1, p2,
+                    ncol   = 2,
+                    labels = c("A", "B"), 
+                    legend = "none") %>%
+  
+          annotate_figure(bottom = text_grob("Nonresponse Rate (%)", size = 11, face = "bold"))
+
+ggsave('img/p_cors.png', p_cors, bg = 'transparent')
+
+p_cors
+```
+
+## Figure 1. Yearly Change in NR and NRB 
+
+```{r}
+p3 <- data %>% 
+        ggplot(aes(Year, MN, colour = Groves)) +
+        geom_point(alpha = 0.5, size = 2, shape = 21) +
+        geom_smooth(method = "lm", se = FALSE) +
+        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
+        scale_y_continuous(expand = c(0, 0), limits = c(-2, 100)) +
+        labs(x     = "Year",
+             y     = "Nonresponse Rate (%)") +
+        theme_nice() +
+        theme(
+              #axis.title.x          = element_blank(),
+              panel.background      = element_rect(fill = 'transparent', color = NA), 
+              plot.background       = element_rect(fill = 'transparent', color = NA))
+
+ggsave('img/p5_nr_year.png', p3, bg = 'transparent')
+
+p4 <- data %>% 
+        ggplot(aes(Year, AbsRelbias, colour = Groves)) +
+        geom_point(alpha = 0.5, size = 2, shape = 21) +
+        geom_smooth(method = "lm", se = FALSE) +
+        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
+        labs(x     = "Year",
+             y     = "Absolute Relative Bias (%)") +
+        theme_nice() +
+        theme(
+              #axis.title.x          = element_blank(),
+              panel.background      = element_rect(fill = 'transparent', color = NA), 
+              plot.background       = element_rect(fill = 'transparent', color = NA))
+
+ggsave('img/p6_nrb_year.png', p4, bg = 'transparent')
+
+p_year <- ggarrange(p3, p4,
+                    ncol   = 2,
+                    labels = c("A", "B"), 
+                    legend = "none") %>%
+  
+          annotate_figure(bottom = text_grob("Year", face = "bold", size = 11))
+
+ggsave('img/p_year.png', p_year, bg='transparent')
+
+p_year
+```
+
+```{r}
+p_all_cors <- ggarrange(p1, p2, p3, p4, 
+                        ncol   = 2,
+                        nrow   = 2,
+                        labels = c("A", "B", "C", "D"), 
+                        legend = "bottom",
+                        common.legend = TRUE)
+  
+ggsave('img/p_all_cors.png', p_all_cors, bg='transparent')
+
+p_all_cors
+```
+
+## Figure 2. Distribution of NR and NRB by Survey Mode
+
+```{r}
+p5 <- data %>% 
+        drop_na(Mode) %>% 
+        ggplot(aes(x = Mode, y = MN)) +
+        geom_violin(aes(fill = Mode), alpha = 0.8) +
+        stat_summary(fun.data=data_summary, alpha = 0.6) +
+        labs(x = "", y = "Nonresponse Rate (%)") +
+        scale_y_continuous(expand = c(0, 0), limits = c(-5, 100)) +
+        scale_fill_jcolors(palette = "pal9") +
+        scale_color_jcolors(palette = "pal9") +
+        theme_nice() +
+        theme(
+              panel.background      = element_rect(fill = 'transparent', color = NA), 
+              plot.background       = element_rect(fill = 'transparent', color = NA), 
+              legend.background     = element_rect(fill = 'transparent'), 
+              legend.box.background = element_rect(fill = 'transparent')) +
+        guides(color = guide_legend(override.aes = list(size = 3) ) )
+
+p6 <- data %>% 
+        drop_na(Mode) %>% 
+        ggplot(aes(x = Mode, y = AbsRelbias)) +
+        geom_violin(aes(fill = Mode), alpha = 0.9) +
+        stat_summary(fun.data = data_summary, alpha = 0.6) +
+        labs(x = "", y = "Absolute Relative Bias (%)") +
+        scale_y_continuous(expand = c(0, 0), limits = c(-5, 100)) +
+        scale_fill_jcolors(palette = "pal9") +
+        theme_nice() +
+        theme(
+              panel.background      = element_rect(fill = 'transparent', color = NA), 
+              plot.background       = element_rect(fill = 'transparent', color = NA), 
+              legend.background     = element_rect(fill = 'transparent')) +
+        guides(color = guide_legend(override.aes = list(size = 3) ) )
+
+p_mode_dists <- ggarrange(p5, p6, ncol = 1,
+                         labels = c("A", "B"), 
+                         legend = "none") %>%
+  
+                annotate_figure(bottom = text_grob("Primary Survey Mode", size = 11, face = "bold"))
+
+ggsave('img/p_mode_dists.png', p_mode_dists, bg ='transparent')
+
+p_mode_dists
+```
+
+
+`
+
