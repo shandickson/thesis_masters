@@ -1,11 +1,11 @@
 # Master Thesis Repository
 
-**Program: Research Masters Methodology & Statistics for the Biomedical, Behavioural, & Social Sciences**
-**Institution: Utrecht Universiteit**
-**Cohort: 2021-2023**
+**Program: Research Masters Methodology & Statistics for the Biomedical, Behavioural, & Social Sciences** \
+**Institution: Utrecht Universiteit** \
+**Cohort: 2021-2023** \
 
-**Author: Shannon S. Dickson**
-**Email: s.s.dickson@students.uu.nl**
+**Author: Shannon S. Dickson** \
+**Email: s.s.dickson@students.uu.nl** \
 
 **Contributors: Dr Peter Lugtig et al. for the dataset**
 
@@ -13,7 +13,7 @@
 
 Inside this repository is everything you need to reproduce my master thesis. There are several types of files contained here:
 
-* .Rmd and .R, where the analysis happens
+* .Rmd and .R, where the analysis happens 
 * .RDS, where the input and output data are
 * .html and .pdf, where the output is created
 
@@ -21,19 +21,19 @@ If you wish to explore these files you will need R and R Studio installed. You c
 
 The repository has the following folders:
 
-1. analysis
-    a. data
-        i.  input: here you will find all the .RDS files input to the .Rmd files
-        ii. output: here you will find all the .RDS files output by the .Rmd files
-    b. img: here you will find all of the images produced by the .Rmd files
-    c. tables: here you will find all of the tables produced by the .Rmd files
+1. analysis \
+    a. data \
+        i.  input: here you will find all the .RDS files input to the .Rmd files \
+        ii. output: here you will find all the .RDS files output by the .Rmd files \
+    b. img: here you will find all of the images produced by the .Rmd files \
+    c. tables: here you will find all of the tables produced by the .Rmd files 
     
-2. research_report: here you will find all of the .Rmd files for the analysis of the midterm report, along with the final .pdf report
-    a. img: here you will find all of the images used in the midterm report
+2. research_report: here you will find all of the .Rmd files for the analysis of the midterm report, along with the final .pdf report \
+    a. img: here you will find all of the images used in the midterm report 
     
-3. thesis_draft
-    a. thesis_draft: here you will find the .Rmd file that produce the thesis report, the latest .pdf, and the .cls file for formatting
-        i. img:  here you will find all of the images used in the thesis
+3. thesis_draft \
+    a. thesis_draft: here you will find the .Rmd file that produce the thesis report, the latest .pdf, and the .cls file for formatting \
+        i. img:  here you will find all of the images used in the thesis 
 
 
 The contents of this repository will be updated over the next few weeks. These documents are not final versions. If you have any further questions please contact me using the details provided above. 
