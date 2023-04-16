@@ -2,10 +2,10 @@
 
 **Program: Research Masters Methodology & Statistics for the Biomedical, Behavioural, & Social Sciences** \
 **Institution: Utrecht Universiteit** \
-**Cohort: 2021-2023** \
+**Cohort: 2021-2023** 
 
 **Author: Shannon S. Dickson** \
-**Email: s.s.dickson@students.uu.nl** \
+**Email: s.s.dickson@students.uu.nl** 
 
 **Contributors: Dr Peter Lugtig et al. for the dataset**
 
