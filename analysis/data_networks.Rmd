@@ -57,9 +57,13 @@ knitr::opts_chunk$set(message = FALSE,
 # Packages:
 library(mgm)
 library(qgraph)
+library(bootnet)
 library(devtools)
 library(tidyverse)
 library(kableExtra)
+library(ggthemes)
+source("functions.R")
+source("plot_theme.R")
 # Data:
 data        <- readRDS("data/input/data_coded.RDS")
 f2f_coded   <- readRDS("data/input/f2f_coded.RDS")
@@ -110,7 +114,7 @@ data_key %>%
   kbl(caption = "Information on how variables are coded") %>% 
   kable_paper(bootstrap_options = "striped", full_width = TRUE) %>% 
   column_spec(1, bold = TRUE) %>% 
-  row_spec(0, bold = TRUE)
+  row_spec(0,    bold = TRUE)
 ```
 
 # Missing data 
@@ -132,7 +136,7 @@ data %>%
 
 Visualising the missingness is also informative. 
 
-```{r}
+```{r, echo = FALSE}
 # Get the relevant sub-selection:
 b <- f2f_coded   %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 c <- mail_coded  %>% select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
@@ -153,21 +157,27 @@ ggmice::plot_pattern(f, rotate = TRUE, square = TRUE)
 
 ```{r, echo = FALSE}
 # Select the variables to be used in the network:
-data_net  <- data        %>%  select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype, Mode)
+data_net  <- data        %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype, Mode)
 
-f2f_net   <- f2f_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+f2f_net   <- f2f_coded   %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 
-mail_net  <- mail_coded  %>%  select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+mail_net  <- mail_coded  %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 
-web_net   <- web_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+web_net   <- web_coded   %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 
-tel_net   <- tel_coded   %>%   select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+tel_net   <- tel_coded   %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 
-paper_net <- paper_coded %>% select(AbsRelbias, MN, Source, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
+paper_net <- paper_coded %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype)
 
 # Combine mail and paper surveys, because there are too few paper surveys:
 mail_net <- rbind(mail_net, paper_net)
 rm(paper_net)
+
+colnames(data_net) <- paste0("N", rep(1:11))
+colnames(f2f_net) <- paste0("N", rep(1:10))
+colnames(web_net) <- paste0("N", rep(1:10))
+colnames(tel_net) <- paste0("N", rep(1:10))
+colnames(mail_net) <- paste0("N", rep(1:10))
 ```
 
 ```{r, echo = FALSE}
@@ -190,27 +200,64 @@ tel_net  <- na.omit(tel_net)
 # Type is "Gaussian" or "Categorical", "g" or "c":
 
 # For the overall network:
-type_all   <- c("g", "g", "c", "c", "c", "c", "c", "c", "c", "c", "c")
-levels_all <- c(1, 1, 5, 2, 2, 3, 2, 2, 2, 3, 5)
+type_all   <- c("g", "g", "g", "c", "c", "c", "c", "c", "c", "c", "c")
+levels_all <- c(1,   1,   1,   2,   2,   2,   2,   2  , 2,   3,   5)
+names_all  <- c(
+                "Nonresponse bias",
+                "Nonresponse rate",
+                "Year",
+                "Salient topic",
+                "Incentives given",
+                "Reminders given",
+                "Sponsored survey",
+                "Health/Other topic",
+                "Special population",
+                "Question type",
+                "Survey mode"
+                )
+
+groups_all <- c(rep(c("Outcome"), 2), rep(c("Survey Design Characteristics"), 9))
+
 # For the mode-specific networks:
-type   <- c("g", "g", "c", "c", "c", "c", "c", "c", "c", "c")
-levels <- c(1, 1, 5, 2, 2, 3, 2, 2, 2, 3)
+type   <- c("g", "g", "g", "c", "c", "c", "c", "c", "c", "c")
+levels <- c(1,   1,   1,   2,   2,   2,   2,   2,   2,   3)
+names  <- c(
+            "Nonresponse bias",
+            "Nonresponse rate",
+            "Year",
+            "Salient topic",
+            "Incentives given",
+            "Reminders given",
+            "Sponsored survey",
+            "Health/Other topic",
+            "Special population",
+            "Question type"
+            )
+
+groups <- c(rep(c("Survey Outcomes"), 2), rep(c("Survey Design Characteristics"), 8))
+
 
 # Combine this information with the dataframes:
-data_net_list <- list(data = data_net, type = type_all, level = levels_all, colnames = colnames(data_net))
-f2f_net_list  <- list(data = f2f_net,  type = type,     level = levels,     colnames = colnames(f2f_net))
-web_net_list  <- list(data = web_net,  type = type,     level = levels,     colnames = colnames(web_net))
-mail_net_list <- list(data = mail_net, type = type,     level = levels,     colnames = colnames(mail_net))
-tel_net_list  <- list(data = tel_net,  type = type,     level = levels,     colnames = colnames(tel_net))
+data_net_list <- list(data = data_net, type = type_all, level = levels_all, colnames = paste0("N", rep(1:11)), names = names_all, groups = groups_all)
+
+f2f_net_list  <- list(data = f2f_net,  type = type,     level = levels,     colnames = paste0("N", rep(1:10)),  names = names, groups = groups)
+
+web_net_list  <- list(data = web_net,  type = type,     level = levels,     colnames = paste0("N", rep(1:10)),  names = names, groups = groups)
+
+mail_net_list <- list(data = mail_net, type = type,     level = levels,     colnames = paste0("N", rep(1:10)), names = names, groups = groups)
+
+tel_net_list  <- list(data = tel_net,  type = type,     level = levels,     colnames = paste0("N", rep(1:10)),  names = names, groups = groups)
 
 # Quick check that everything is correct:
 length(type_all)
 length(levels_all)
 length(data_net)
+length(names_all)
 
 length(f2f_net)
 length(levels)
 length(type)
+length(names)
 ```
 
 # Network Modelling
@@ -233,8 +280,7 @@ set.seed(123)
 mgm_mod <- mgm(data       = as.matrix(data_net_list$data), 
                type       = data_net_list$type,
                level      = data_net_list$levels,
-               k          = 2,
-               moderators = 11,
+               moderators = 1,
                lambdaSel  = 'EBIC', 
                lambdaGam  = 0.25,
                ruleReg    = "OR",
@@ -247,19 +293,19 @@ mgm_mod <- mgm(data       = as.matrix(data_net_list$data),
 
 # Condition 0 estimates a network where the moderator is Mode == Paper:
 cond0 <- condition(object = mgm_mod, 
-                   values = list('11' = 0))
+                   values = list('1' = 0))
 # Condition 1 estimates a network where the moderator is Mode == F2F:
 cond1 <- condition(object = mgm_mod, 
-                   values = list('11' = 1))
+                   values = list('1' = 1))
 # Condition 2 estimates a network where the moderator is Mode == Mail:
 cond2 <- condition(object = mgm_mod, 
-                   values = list('11' = 2))
+                   values = list('1' = 2))
 # Condition 3 estimates a network where the moderator is Mode == Telephone:
 cond3 <- condition(object = mgm_mod, 
-                   values = list('11' = 3))
+                   values = list('1' = 3))
 # Condition 4 estimates a network where the moderator is Mode == Web:
 cond4 <- condition(object = mgm_mod, 
-                   values = list('11' = 4))
+                   values = list('1' = 4))
 
 # Create a list of the conditions, we will use for plotting:
 conditions <- list(cond0, cond1, cond2, cond3, cond4)
@@ -271,50 +317,49 @@ max_val <- max(max(conditions[[1]]$pairwise$wadj),
                max(conditions[[4]]$pairwise$wadj),
                max(conditions[[5]]$pairwise$wadj))
 
-# Make nice node names:
-nice_colnames <- c("Absolute relative bias",
-                   "Nonresponse rate",
-                   "Source",
-                   "Saliency",
-                   "Incentivised",
-                   "Reminders",
-                   "Sponsorship",
-                   "Survey topic",
-                   "Special population",
-                   "Question type",
-                   "Mode")
+#L <- averageLayout(conditions[[i]]$pairwise$wadj)
+
+# Overall plot
+qgraph(input          = mgm_mod$pairwise$wadj,
+       layout         = "circle",
+       edge.color     = mgm_mod$pairwise$edgecolor, 
+       legend.cex     = 0.5,
+       vsize          = 7,
+       esize          = 10,
+       font           = 4,
+       filetype       = "png",
+       filename       = "img/moderated_networks/mgm_mod",
+       bg             = "transparent")
 
 # Partition a plot space:                                    
-par(mfrow=c(3, 2))
+#par(mfrow=c(3, 2))
 
 # Iterate over the conditions with qgraph:
-for(i in 1:5) qgraph(input               = conditions[[i]]$pairwise$wadj,
-                     layout              = "circle", 
-                     edge.color          = c("#273B5B", "#E48F1B", "grey90"),
-                     ruleReg             = "OR",
-                     lambdaSel           = 'EBIC', 
-                     lambdaGam           = 0.25,
-                     binarySign          = TRUE,
-                     maximum             = max_val,
-                     nodeNames           = nice_colnames,
-                     legend.cex          = 0.7,
-                     vsize               = 7,
-                     esize               = 10,
-                     #curveAll            = TRUE,
-                     #curveDefault        = 0.5,
-                     font                = 4,
-                     title               = paste0("Mode = ", c("Paper", "F2F", "Mail", "Telephone", "Web")[i]))
-                     #filetype       = "png",
-                     #filename       = paste0("img/mgm_mod_", c("Paper", "F2F", "Mail", "Telephone", "Web")[i]),
-                     #bg             = "transparent")
+for(i in 1:5) qgraph(input      = conditions[[i]]$pairwise$wadj,
+                     layout     = "circle",
+                     edge.color = c("#273B5B", "#E48F1B", "#A9A9A9"),
+                     labels     = TRUE, 
+                     label.font = 4, 
+                     #nodeNames  = data_net_list$names,
+                     maximum    = max_val,
+                     legend.cex = 0.7,
+                     vsize      = 7,
+                     esize      = 10,
+                     font       = 4,
+                     #title      = paste0("Mode = ", c("Paper", "F2F", "Mail", "Telephone", "Web")[i]),
+                     filetype   = "png",
+                     filename   = paste0("img/moderated_networks/mgm_mod_", c("paper", "f2f", "mail", "telephone", "web")[i]),
+                     bg         = "transparent")
 ```
 
-## Overall MGM
+
+## Split modes
 
 ```{r, echo = FALSE}
 # Set a seed for reproducibility:
 set.seed(123)
-# Estimate the overall network:
+
+# Estimate all the network models
 mgm_all <- mgm(data       = as.matrix(data_net_list$data), 
                type       = data_net_list$type,
                level      = data_net_list$levels,
@@ -323,66 +368,8 @@ mgm_all <- mgm(data       = as.matrix(data_net_list$data),
                lambdaGam  = 0.25,
                ruleReg    = "OR",
                binarySign = TRUE,
-               scale      = TRUE, 
-               pbar       = FALSE,
-               saveModels = TRUE)
+               scale      = TRUE)
 
-# Create predictions based on the network,
-# Categorical == nCC meaning correct classifications,
-# Continuous  == R2 meaning % explained variance:
-mgm_predict_all <- predict(object   = mgm_all,
-                           data     = data_net_list$data, 
-                           errorCat = 'nCC',
-                           errorCon = 'R2')
-
-# Take a look at the errors:
-mgm_predict_all$error
-
-# Create a neat list of the errors for all variable types,
-# Looping over the continuous and then the categorical errors.
-errors <- list()
-for(i in 1:2)  errors[[i]] <- mgm_predict_all$errors[i,2]
-for(i in 3:11) errors[[i]] <- mgm_predict_all$errors[i,3]
-
-# Do something similar where we store colours for the errors:
-colors <- list()
-colors <- list()
-for(i in 1:2)  colors[[i]] <- "#90B4D4"
-for(i in 3:11) colors[[i]] <- c("#FFA500", "#FF4300")
-
-# Network plot:
-qgraph(input       = mgm_all$pairwise$wadj,
-       layout      = 'circle',
-       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
-       nodeNames   = nice_colnames,
-       legend.cex  = 0.7,
-       pie         = errors, 
-       pieColor    = colors,
-       legend.cex  = 0.7,
-       vsize       = 7,
-       esize       = 10,
-       font        = 4,
-       filetype    = "png", 
-       filename    = "img/mgm_all_preds",
-       bg          = "transparent")
-
-# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
-mgm_all_pairwise <- data.frame(mgm_all$pairwise$wadj,         row.names = colnames(data_net))
-mgm_all_nodewise <- data.frame(mgm_all$pairwise$wadjNodewise, row.names = colnames(data_net))
-# Add column names to the data frame:
-colnames(mgm_all_pairwise)<-names(data_net)
-colnames(mgm_all_nodewise)<-names(data_net)
-# Save the dataframes as RDS files:
-saveRDS(mgm_all_pairwise, "data/output/mgm_all_pairwise.RDS")
-saveRDS(mgm_all_nodewise, "data/output/mgm_all_nodewise.RDS")
-```
-
-## Face-to-Face MGM
-
-```{r, echo = FALSE}
-# Set a seed for reproducibility:
-set.seed(123)
-# Estimate the F2F network:
 mgm_f2f <- mgm(data       = as.matrix(f2f_net_list$data), 
                type       = f2f_net_list$type,
                level      = f2f_net_list$levels,
@@ -391,62 +378,8 @@ mgm_f2f <- mgm(data       = as.matrix(f2f_net_list$data),
                lambdaGam  = 0.25,
                ruleReg    = "OR",
                binarySign = TRUE,
-               scale      = TRUE, 
-               pbar       = FALSE)
+               scale      = TRUE)
 
-
-# Create predictions based on the network,
-# Categorical == nCC meaning correct classifications,
-# Continuous  == R2 meaning % explained variance:
-mgm_predict_f2f <- predict(object   = mgm_f2f,
-                           data     = f2f_net_list$data, 
-                           errorCat = 'nCC',
-                           errorCon = 'R2')
-# Take a look at the errors:
-mgm_predict_f2f$error
-
-# Create a neat list of the errors for all variable types,
-# Looping over the continuous and then the categorical errors.
-errors <- list()
-for(i in 1:2)  errors[[i]] <- mgm_predict_f2f$errors[i,2]
-for(i in 3:10) errors[[i]] <- mgm_predict_f2f$errors[i,3]
-# Do something similar where we store colours for the errors:
-colors <- list()
-for(i in 1:2)  colors[[i]] <- "#90B4D4"
-for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
-# Network plot:
-qgraph(input       = mgm_f2f$pairwise$wadj,
-       layout      = 'circle',
-       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
-       nodeNames   = nice_colnames[1:10],
-       legend.cex  = 0.7,
-       pie         = errors, 
-       pieColor    = colors,
-       legend.cex  = 0.7,
-       vsize       = 7,
-       esize       = 10,
-       font        = 4,
-       filetype    = "png", 
-       filename    = "img/mgm_f2f_preds",
-       bg          = "transparent")
-
-# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
-mgm_f2f_pairwise <- data.frame(mgm_f2f$pairwise$wadj,         row.names = colnames(f2f_net))
-mgm_f2f_nodewise <- data.frame(mgm_f2f$pairwise$wadjNodewise, row.names = colnames(f2f_net))
-# Add column names to the data frame:
-colnames(mgm_f2f_pairwise) <- names(f2f_net)
-colnames(mgm_f2f_nodewise) <- names(f2f_net)
-# Save the dataframes as RDS files:
-saveRDS(mgm_f2f_pairwise, "data/output/mgm_f2f_pairwise.RDS")
-saveRDS(mgm_f2f_nodewise, "data/output/mgm_f2f_nodewise.RDS")
-```
-
-## Web MGM
-
-```{r, echo = FALSE}
-# Set a seed for reproducibility:
-set.seed(123)
-# Estimate the web network:
 mgm_web <- mgm(data       = as.matrix(web_net_list$data), 
                type       = web_net_list$type,
                level      = web_net_list$levels,
@@ -455,63 +388,8 @@ mgm_web <- mgm(data       = as.matrix(web_net_list$data),
                lambdaGam  = 0.25,
                ruleReg    = "OR",
                binarySign = TRUE,
-               scale      = TRUE, 
-               pbar       = FALSE)
+               scale      = TRUE)
 
-# Create predictions based on the network,
-# Categorical == nCC meaning correct classifications,
-# Continuous  == R2 meaning % explained variance:
-mgm_predict_web <- predict(object   = mgm_web,
-                           data     = web_net_list$data, 
-                           errorCat = 'nCC',
-                           errorCon = 'R2')
-
-# Take a look at the errors:
-mgm_predict_web$error
-
-# Create a neat list of the errors for all variable types,
-# Looping over the continuous and then the categorical errors:
-errors <- list()
-for(i in 1:2)  errors[[i]] <- mgm_predict_web$errors[i,2]
-for(i in 3:10) errors[[i]] <- mgm_predict_web$errors[i,3]
-# Do something similar where we store colours for the errors:
-colors <- list()
-for(i in 1:2)  colors[[i]] <- "#90B4D4"
-for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
-
-# Network plot:
-qgraph(input       = mgm_web$pairwise$wadj,
-       layout      = 'circle',
-       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
-       nodeNames   = nice_colnames[1:10],
-       legend.cex  = 0.7,
-       pie         = errors, 
-       pieColor    = colors,
-       legend.cex  = 0.7,
-       vsize       = 7,
-       esize       = 10,
-       font        = 4,
-       filetype    = "png", 
-       filename    = "img/mgm_web_preds",
-       bg          = "transparent")
-
-# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
-mgm_web_pairwise <- data.frame(mgm_web$pairwise$wadj,         row.names = colnames(web_net))
-mgm_web_nodewise <- data.frame(mgm_web$pairwise$wadjNodewise, row.names = colnames(web_net))
-# Add column names to the data frame:
-colnames(mgm_web_pairwise) <- names(web_net)
-colnames(mgm_web_nodewise) <- names(web_net)
-# Save the dataframes as RDS files:
-saveRDS(mgm_web_pairwise, "data/output/mgm_web_pairwise.RDS")
-saveRDS(mgm_web_nodewise, "data/output/mgm_web_nodewise.RDS")
-```
-
-## Mail MGM
-
-```{r, echo = FALSE}
-# Set a seed for reproducibility:
-set.seed(123)
-# Estimate the mail network:
 mgm_mail <- mgm(data      = as.matrix(mail_net_list$data), 
                type       = mail_net_list$type,
                level      = mail_net_list$levels,
@@ -520,63 +398,8 @@ mgm_mail <- mgm(data      = as.matrix(mail_net_list$data),
                lambdaGam  = 0.25,
                ruleReg    = "OR",
                binarySign = TRUE,
-               scale      = TRUE, 
-               pbar       = FALSE)
+               scale      = TRUE)
 
-
-# Create predictions based on the network,
-# Categorical == nCC meaning correct classifications,
-# Continuous  == R2 meaning % explained variance:
-mgm_predict_mail <- predict(object   = mgm_mail,
-                            data     = mail_net_list$data, 
-                            errorCat = 'nCC',
-                            errorCon = 'R2')
-# Take a look at the errors:
-mgm_predict_mail$error
-
-# Create a neat list of the errors for all variable types,
-# Looping over the continuous and then the categorical errors:
-errors <- list()
-for(i in 1:2)  errors[[i]] <- mgm_predict_mail$errors[i,2]
-for(i in 3:10) errors[[i]] <- mgm_predict_mail$errors[i,3]
-# Do something similar where we store colours for the errors:
-colors <- list()
-for(i in 1:2)  colors[[i]] <- "#90B4D4"
-for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
-
-# Network plot:
-qgraph(input       = mgm_mail$pairwise$wadj,
-       layout      = 'circle',
-       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
-       nodeNames   = nice_colnames[1:10],
-       legend.cex  = 0.7,
-       pie         = errors, 
-       pieColor    = colors,
-       legend.cex  = 0.7,
-       vsize       = 7,
-       esize       = 10,
-       font        = 4,
-       filetype    = "png", 
-       filename    = "img/mgm_mail_preds",
-       bg          = "transparent")
-
-# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
-mgm_mail_pairwise <- data.frame(mgm_mail$pairwise$wadj,         row.names = colnames(mail_net))
-mgm_mail_nodewise <- data.frame(mgm_mail$pairwise$wadjNodewise, row.names = colnames(mail_net))
-# Add column names to the data frame:
-colnames(mgm_mail_pairwise) <- names(mail_net)
-colnames(mgm_mail_nodewise) <- names(mail_net)
-# Save the dataframes as RDS files:
-saveRDS(mgm_mail_pairwise, "data/output/mgm_mail_pairwise.RDS")
-saveRDS(mgm_mail_nodewise, "data/output/mgm_mail_nodewise.RDS")
-```
-
-## Telephone MGM
-
-```{r}
-# Set a seed for reproducibility:
-set.seed(123)
-# Estimate the telephone network:
 mgm_tel <- mgm(data       = as.matrix(tel_net_list$data), 
                type       = tel_net_list$type,
                level      = tel_net_list$levels,
@@ -585,83 +408,757 @@ mgm_tel <- mgm(data       = as.matrix(tel_net_list$data),
                lambdaGam  = 0.25,
                ruleReg    = "OR",
                binarySign = TRUE,
-               scale      = TRUE, 
-               pbar       = FALSE)
+               scale      = TRUE)
+```
 
-# Create predictions based on the network,
-# Categorical == nCC meaning correct classifications,
-# Continuous  == R2 meaning % explained variance:
+## Predictions
+
+```{r}
+# Get the network predictions
+mgm_predict_all <- predict(object   = mgm_all,
+                           data     = data_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+mgm_predict_f2f <- predict(object   = mgm_f2f,
+                           data     = f2f_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+mgm_predict_web <- predict(object   = mgm_web,
+                           data     = web_net_list$data, 
+                           errorCat = 'nCC',
+                           errorCon = 'R2')
+
+mgm_predict_mail <- predict(object   = mgm_mail,
+                            data     = mail_net_list$data, 
+                            errorCat = 'nCC',
+                            errorCon = 'R2')
+
 mgm_predict_tel <- predict(object   = mgm_tel,
                            data     = tel_net_list$data, 
                            errorCat = 'nCC',
                            errorCon = 'R2')
 
-# Take a look at the errors:
-mgm_predict_tel$error
+predictions_list <- list(mgm_predict_all$errors, mgm_predict_f2f$errors, mgm_predict_web$errors, mgm_predict_mail$errors, mgm_predict_tel$errors)
+```
 
+```{r}
 # Create a neat list of the errors for all variable types,
-# Looping over the continuous and then the categorical errors:
-errors <- list()
-for(i in 1:2)  errors[[i]] <- mgm_predict_tel$errors[i,2]
-for(i in 3:10) errors[[i]] <- mgm_predict_tel$errors[i,3]
-# Do something similar where we store colours for the errors:
-colors <- list()
-for(i in 1:2)  colors[[i]] <- "#90B4D4"
-for(i in 3:10) colors[[i]] <- c("#FFA500", "#FF4300")
+# Looping over the continuous and then the categorical errors.
 
-# Network plot:
-qgraph(input       = mgm_tel$pairwise$wadj,
-       layout      = 'circle',
-       edge.color  = c("#273B5B", "#E48F1B", "grey90"),
-       nodeNames   = nice_colnames[1:10],
-       legend.cex  = 0.7,
-       pie         = errors, 
-       pieColor    = colors,
-       legend.cex  = 0.7,
+errors_all <- c()
+colors_all <- c()
+
+for(i in 1:3)       errors_all[[i]] <- predictions_list[[1]][i,2]
+for(i in c(4:11)) errors_all[[i]] <- predictions_list[[1]][i,3]
+
+for(i in 1:3)       colors_all[[i]] <- "#7fc97f"
+for(i in c(4:11)) colors_all[[i]] <- c("#fec66b")
+
+errors_f2f <- c()
+colors_f2f <- c()
+
+for(i in 1:3)     errors_f2f[[i]] <- predictions_list[[2]][i,2]
+for(i in c(4:10)) errors_f2f[[i]] <- predictions_list[[2]][i,3]
+
+for(i in 1:3)     colors_f2f[[i]] <-   "#7fc97f"
+for(i in c(4:10)) colors_f2f[[i]] <- c("#fec66b")
+
+errors_mail <- c()
+colors_mail <- c()
+
+for(i in 1:3)     errors_mail[[i]] <- predictions_list[[3]][i,2]
+for(i in c(4:10)) errors_mail[[i]] <- predictions_list[[3]][i,3]
+
+for(i in 1:3)     colors_mail[[i]] <-   "#7fc97f"
+for(i in c(4:10)) colors_mail[[i]] <- c("#fec66b")
+
+errors_web <- c()
+colors_web <- c()
+
+for(i in 1:3)     errors_web[[i]] <- predictions_list[[4]][i,2]
+for(i in c(4:10)) errors_web[[i]] <- predictions_list[[4]][i,3]
+
+for(i in 1:3)     colors_web[[i]] <-   "#7fc97f"
+for(i in c(4:10)) colors_web[[i]] <- c("#fec66b")
+
+errors_tel <- c()
+colors_tel <- c()
+
+for(i in 1:3)     errors_tel[[i]] <- predictions_list[[5]][i,2]
+for(i in c(4:10)) errors_tel[[i]] <- predictions_list[[5]][i,3]
+
+for(i in 1:3)     colors_tel[[i]] <-   "#7fc97f"
+for(i in c(4:10)) colors_tel[[i]] <- c("#fec66b")
+
+```
+
+```{r}
+# Modify some plotting options
+max_val <- max(
+               max(mgm_f2f$pairwise$wadj),
+               max(mgm_web$pairwise$wadj),
+               max(mgm_mail$pairwise$wadj),
+               max(mgm_tel$pairwise$wadj))
+
+min_val <- min(
+               min(mgm_f2f$pairwise$wadj),
+               min(mgm_web$pairwise$wadj),
+               min(mgm_mail$pairwise$wadj),
+               min(mgm_tel$pairwise$wadj))
+
+cut_val <- max(
+               quantile(mgm_f2f$pairwise$wadj,  .75),
+               quantile(mgm_web$pairwise$wadj,  .75),
+               quantile(mgm_mail$pairwise$wadj, .75),
+               quantile(mgm_tel$pairwise$wadj,  .75))
+
+L     <- averageLayout(mgm_f2f$pairwise$wadj, mgm_tel$pairwise$wadj, mgm_mail$pairwise$wadj, mgm_web$pairwise$wadj, layout = 'spring')
+#L_mat <- t(matrix(c(1, 0, 2, 3, 4, 5), ncol = 3))
+
+mgm_all$pairwise$edgecolor <- ifelse(mgm_all$pairwise$edgecolor == "darkgreen", "blue", mgm_all$pairwise$edgecolor)
+mgm_all$pairwise$edgecolor <- ifelse(mgm_all$pairwise$edgecolor == "red", "#cb4154", mgm_all$pairwise$edgecolor)
+
+mgm_f2f$pairwise$edgecolor <- ifelse(mgm_f2f$pairwise$edgecolor == "darkgreen", "blue", mgm_f2f$pairwise$edgecolor)
+mgm_f2f$pairwise$edgecolor <- ifelse(mgm_f2f$pairwise$edgecolor == "red", "#cb4154", mgm_f2f$pairwise$edgecolor)
+
+mgm_mail$pairwise$edgecolor <- ifelse(mgm_mail$pairwise$edgecolor == "darkgreen", "blue", mgm_mail$pairwise$edgecolor)
+mgm_mail$pairwise$edgecolor <- ifelse(mgm_mail$pairwise$edgecolor == "red", "#cb4154", mgm_mail$pairwise$edgecolor)
+
+mgm_web$pairwise$edgecolor <- ifelse(mgm_web$pairwise$edgecolor == "darkgreen", "blue", mgm_web$pairwise$edgecolor)
+mgm_web$pairwise$edgecolor <- ifelse(mgm_web$pairwise$edgecolor == "red", "#cb4154", mgm_web$pairwise$edgecolor)
+
+mgm_tel$pairwise$edgecolor <- ifelse(mgm_tel$pairwise$edgecolor == "darkgreen", "blue", mgm_tel$pairwise$edgecolor)
+mgm_tel$pairwise$edgecolor <- ifelse(mgm_tel$pairwise$edgecolor == "red", "#cb4154", mgm_tel$pairwise$edgecolor)
+```
+
+```{r, echo = FALSE}
+# Plot and save all the networks
+qgraph(input       = mgm_all$pairwise$wadj,
+       edge.color  = mgm_all$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_all, 
+       pieColor    = colors_all,
+       #maximum     = max_val,
+       #cut         = cut_val,
+       nodeNames   = data_net_list$names,
+       groups      = data_net_list$groups,
+       labels      = paste0("N", rep(1:11)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE,
+       legend.mode = "style1",
+       layout      = "spring",
        vsize       = 7,
-       esize       = 10,
        font        = 4,
        filetype    = "png", 
-       filename    = "img/mgm_tel_preds",
+       filename    = "img/split_networks/mgm_all",
+       width       = 8,
+       height      = 8,
        bg          = "transparent")
 
-# Save the pairwise and nodewise weighted adjacency matrices fromn the network:
-mgm_tel_pairwise <- data.frame(mgm_tel$pairwise$wadj,         row.names = colnames(tel_net))
-mgm_tel_nodewise <- data.frame(mgm_tel$pairwise$wadjNodewise, row.names = colnames(tel_net))
-# Add column names to the data frame:
-colnames(mgm_tel_pairwise) <- names(tel_net)
-colnames(mgm_tel_nodewise) <- names(tel_net)
-# Save the dataframes as RDS files:
-saveRDS(mgm_tel_pairwise, "data/output/mgm_tel_pairwise.RDS")
-saveRDS(mgm_tel_nodewise, "data/output/mgm_tel_nodewise.RDS")
+qgraph(input  = mgm_f2f$pairwise$wadj,
+       edge.color  = mgm_f2f$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_f2f, 
+       pieColor    = colors_f2f,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = f2f_net_list$names,
+       groups      = f2f_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/split_networks/mgm_f2f",
+       width       = 8,
+       height      = 8,
+       bg          = "transparent")
+
+qgraph(input       = mgm_mail$pairwise$wadj,
+       edge.color  = mgm_mail$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_mail, 
+       pieColor    = colors_mail,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = mail_net_list$names,
+       groups      = mail_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4,
+       groups      = mail_net_list$groups,
+       filetype    = "png", 
+       filename    = "img/split_networks/mgm_mail",
+       width       = 8,
+       height      = 8,
+       bg          = "transparent")
+
+qgraph(input       = mgm_web$pairwise$wadj,
+       edge.color  = mgm_web$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_web, 
+       pieColor    = colors_web,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = web_net_list$names,
+       groups      = web_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/split_networks/mgm_web",
+       width       = 8,
+       height      = 8,
+       bg          = "transparent")
+
+qgraph(input       = mgm_tel$pairwise$wadj,
+       edge.color  = mgm_tel$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_tel, 
+       pieColor    = colors_tel,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = tel_net_list$names,
+       groups      = tel_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE, 
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4,
+       filetype    = "png", 
+       filename    = "img/split_networks/mgm_telephone",
+       width       = 8,
+       height      = 8,
+       bg          = "transparent")
 ```
+
+```{r, eval = FALSE}
+L_mat <- t(matrix(c(1, 1, 2, 3, 4, 5), ncol = 3))
+# Plot and save all the networks
+qgraph(input       = mgm_all$pairwise$wadj,
+       edge.color  = mgm_all$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_all, 
+       pieColor    = colors_all,
+       #maximum     = max_val,
+       #cut         = cut_val,
+       nodeNames   = data_net_list$names,
+       groups      = data_net_list$groups,
+       labels      = paste0("N", rep(1:11)),
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend      = FALSE,
+       legend.mode = "style1",
+       layout      = 'spring',
+       vsize       = 7,
+       font        = 4)
+
+qgraph(input  = mgm_f2f$pairwise$wadj,
+       edge.color  = mgm_f2f$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_f2f, 
+       pieColor    = colors_f2f,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = f2f_net_list$names,
+       groups      = f2f_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend      = FALSE,
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4)
+
+qgraph(input       = mgm_tel$pairwise$wadj,
+       edge.color  = mgm_tel$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_tel, 
+       pieColor    = colors_tel,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = tel_net_list$names,
+       groups      = tel_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend      = FALSE,
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4)
+
+qgraph(input       = mgm_mail$pairwise$wadj,
+       edge.color  = mgm_mail$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_mail, 
+       pieColor    = colors_mail,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = mail_net_list$names,
+       groups      = mail_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend      = FALSE,
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4)
+
+qgraph(input       = mgm_web$pairwise$wadj,
+       edge.color  = mgm_web$pairwise$edgecolor,
+       color       = rep("white", 2),
+       pie         = errors_web, 
+       pieColor    = colors_web,
+       #maximum     = max_val,
+       cut         = cut_val,
+       nodeNames   = web_net_list$names,
+       groups      = web_net_list$groups,
+       labels      = paste0("N", rep(1:10)),
+       legend      = FALSE,
+       legend.cex  = 0.50,
+       GLratio     = 1.8,
+       legend.mode = "style1",
+       layout      = L,
+       vsize       = 7,
+       font        = 4)
+
+#legend("bottomright", legend = web_net_list$names)
+```
+
+# Pairwise and Nodewise Interactions
+
+```{r, echo = FALSE}
+# Overall network
+overall_pairwise <- data.frame(mgm_all$pairwise$wadj, row.names = colnames(data_net))
+overall_pairwise <- data.frame(mgm_all$pairwise$wadjNodewise, row.names = colnames(data_net))
+# Add column names to the data frame:
+colnames(overall_pairwise)<-names(data_net)
+colnames(overall_pairwise)<-names(data_net)
+# Save the dataframes as RDS files:
+saveRDS(overall_pairwise, "data/output/overall_pairwise.RDS")
+saveRDS(overall_pairwise, "data/output/overall_nodewise.RDS")
+
+# F2F network
+f2f_pairwise <- data.frame(mgm_f2f$pairwise$wadj, row.names = colnames(f2f_net))
+f2f_nodewise <- data.frame(mgm_f2f$pairwise$wadjNodewise, row.names = colnames(f2f_net))
+# Add column names to the data frame:
+colnames(f2f_pairwise) <- names(f2f_net)
+colnames(f2f_pairwise) <- names(f2f_net)
+# Save the dataframes as RDS files:
+saveRDS(f2f_pairwise, "data/output/f2f_pairwise.RDS")
+saveRDS(f2f_pairwise, "data/output/f2f_nodewise.RDS")
+
+# Web network
+web_pairwise <- data.frame(mgm_web$pairwise$wadj,         row.names = colnames(web_net))
+web_pairwise <- data.frame(mgm_web$pairwise$wadjNodewise, row.names = colnames(web_net))
+# Add column names to the data frame:
+colnames(web_pairwise) <- names(web_net)
+colnames(web_pairwise) <- names(web_net)
+# Save the dataframes as RDS files:
+saveRDS(web_pairwise, "data/output/web_pairwise.RDS")
+saveRDS(web_pairwise, "data/output/web_nodewise.RDS")
+
+# Mail network
+mail_pairwise <- data.frame(mgm_mail$pairwise$wadj,         row.names = colnames(mail_net))
+mail_nodewise <- data.frame(mgm_mail$pairwise$wadjNodewise, row.names = colnames(mail_net))
+# Add column names to the data frame:
+colnames(mail_pairwise) <- names(mail_net)
+colnames(mail_pairwise) <- names(mail_net)
+# Save the dataframes as RDS files:
+saveRDS(mail_pairwise, "data/output/mail_pairwise.RDS")
+saveRDS(mail_pairwise, "data/output/mail_nodewise.RDS")
+
+# Telephone network
+tel_pairwise <- data.frame(mgm_tel$pairwise$wadj,         row.names = colnames(tel_net))
+tel_pairwise <- data.frame(mgm_tel$pairwise$wadjNodewise, row.names = colnames(tel_net))
+# Add column names to the data frame:
+colnames(tel_pairwise) <- names(tel_net)
+colnames(tel_pairwise) <- names(tel_net)
+# Save the dataframes as RDS files:
+saveRDS(tel_pairwise, "data/output/tel_pairwise.RDS")
+saveRDS(tel_pairwise, "data/output/tel_nodewise.RDS")
+```
+
 
 # Network Centrality
 
 ```{r, eval=F}
+set.seed(123)
 # Use bootnet to estimate the network:
-overall_net_strength <- bootnet::estimateNetwork(data_net_list$data, type = data_net_list$type, levels = data_net_list$level, default = "mgm")
-f2f_net_strength     <- bootnet::estimateNetwork(f2f_net_list$data,  type = f2f_net_list$type,  levels = f2f_net_list$level,  default = "mgm")
-mail_net_strength    <- bootnet::estimateNetwork(mail_net_list$data, type = mail_net_list$type, levels = mail_net_list$level, default = "mgm")
-web_net_strength     <- bootnet::estimateNetwork(web_net_list$data,  type = web_net_list$type,  levels = web_net_list$level,  default = "mgm")
-tel_net_strength     <- bootnet::estimateNetwork(tel_net_list$data,  type = tel_net_list$type,  levels = tel_net_list$level,  default = "mgm")
-# Strength Centrality:
-centralityPlot(overall_net_strength, scale = "raw0", include = c("Strength"))
-centralityPlot(f2f_net_strength,     scale = "raw0", include = c("Strength"))
-centralityPlot(mail_net_strength,    scale = "raw0", include = c("Strength"))
-centralityPlot(web_net_strength,     scale = "raw0", include = c("Strength"))
-centralityPlot(tel_net_strength,     scale = "raw0", include = c("Strength"))
+overall_net_strength <- bootnet::estimateNetwork(data_net_list$data,
+                                                 type =  data_net_list$type,
+                                                 level = data_net_list$level,
+                                                 rule = "OR",
+                                                 binarySign = TRUE,
+                                                 default = "mgm")
+
+f2f_net_strength  <- bootnet::estimateNetwork(f2f_net_list$data, 
+                                              type =  f2f_net_list$type,
+                                              level = f2f_net_list$level,
+                                              default = "mgm")
+
+mail_net_strength <- bootnet::estimateNetwork(mail_net_list$data, 
+                                              type =  mail_net_list$type,
+                                              level = mail_net_list$level,
+                                              default = "mgm")
+
+web_net_strength  <- bootnet::estimateNetwork(web_net_list$data, 
+                                              type =  web_net_list$type,
+                                              level = web_net_list$level,
+                                              default = "mgm")
+
+tel_net_strength  <- bootnet::estimateNetwork(tel_net_list$data, 
+                                              type =  tel_net_list$type,
+                                              level = tel_net_list$level,
+                                              default = "mgm")
+
+strength_overall <-  centralityPlot(overall_net_strength,
+                               scale = "z-scores",
+                               include = "Strength") +
+  
+                labs(x = "Standardized z-score", y = "Node", color=NULL) +
+                theme_thesis() +
+                theme(legend.position = "right",
+                      legend.direction = "vertical")
+
+strength_ei_overall <-  centralityPlot(overall_net_strength,
+                               scale = "z-scores",
+                               include = c("Strength", "ExpectedInfluence")) +
+  
+  
+                labs(x = "Standardized z-score", y = "Node", color=NULL) +
+                theme_thesis() +
+                theme(legend.position = "right",
+                      legend.direction = "vertical")
+
+all_strength <- centralityPlot(list(
+                                    "Face-to-face" = f2f_net_strength,
+                                    "Mail" = mail_net_strength,
+                                    "Web" = web_net_strength,
+                                    "Telephone" = tel_net_strength),
+                               scale = "z-scores",
+                               include = "Strength") +
+  
+                labs(x = "Standardized z-score", y = "Node", color=NULL) +
+                scale_colour_thesis() + theme_thesis() +
+                theme(legend.position = "right",
+                      legend.direction = "vertical") 
+
+all_strength_ei <- centralityPlot(list(
+                                    "Face-to-face" = f2f_net_strength,
+                                    "Mail" = mail_net_strength,
+                                    "Web" = web_net_strength,
+                                    "Telephone" = tel_net_strength),
+                               scale = "z-scores",
+                               include = c("Strength", "ExpectedInfluence")) +
+  
+                labs(x = "Standardized z-score", y = "Node", color=NULL) +
+                scale_colour_thesis() + theme_thesis() +
+                theme(legend.position = "top",
+                      legend.direction = "horizontal") 
+
+# Save Strength plots:
+ggsave('img/centrality_plots/strength_ei_overall.png',  strength_ei_overall, bg ='transparent', height = 7, width = 5)
+ggsave('img/centrality_plots/strength_overall.png',  strength_overall, bg ='transparent', height = 7, width = 5)
+
+ggsave('img/centrality_plots/all_strength_ei.pdf',  all_strength_ei, bg ='transparent', height = 10, width = 7)
+ggsave('img/centrality_plots/all_strength.png',  all_strength, bg ='transparent', height = 7, width = 5)
 ```
+
 
 # Network Stability
 
+Using the `bootnet` function from the `bootnet` package, we estimate the **Bootstrapped Confidence Intervals** which show the variability in parameter estimates that is to be expected in the data. 
+
 ```{r, eval=F}
+dfs <- list(overall_net_strength, f2f_net_strength, mail_net_strength, web_net_strength, tel_net_strength)
+
+# Run the bootstrap tests for each network
+boots_nonparametric <- do_stability(dfs, nB = 1000, nC = 8, which_boot = "NP")
+boots_casedropping  <- do_stability(dfs, nB = 1000, nC = 8, which_boot = "CD")
+# Save the output
+saveRDS(boots_nonparametric, "data/output/boots_nonparametric.RDS")
+saveRDS(boots_casedropping,  "data/output/boots_casedropping.RDS")
+```
+
+```{r, message=F,warning=F,eval=F}
+boots_nonparametric <- readRDS("data/output/boots_nonparametric.RDS")
+boots_casedropping <- readRDS("data/output/boots_casedropping.RDS")
+
+plots_np_edge <- plot_stability(boots_nonparametric, which_boot = "NP", which_plot = "accuracy",   panels = FALSE, labels = TRUE, legend = "none")
+plots_np_diff <- plot_stability(boots_nonparametric, which_boot = "NP", which_plot = "difference", panels = FALSE)
+
+plots_cd_stre <- plot_stability(boots_casedropping,  which_boot = "CD", which_plot = "stability",  panels = FALSE, legend = "none")
+
+ggsave('img/boot_plots/p_np_accuracy_all.png',     plots_np_edge[[2]][[1]], bg ='transparent', height = 8, width = 4, dpi = 300)
+ggsave('img/boot_plots/p_np_accuracy_f2f.png',     plots_np_edge[[2]][[2]], bg ='transparent', height = 8, width = 4, dpi = 300)
+ggsave('img/boot_plots/p_np_accuracy_mail.png',    plots_np_edge[[2]][[3]], bg ='transparent', height = 8, width = 4, dpi = 300)
+ggsave('img/boot_plots/p_np_accuracy_web.png',     plots_np_edge[[2]][[4]], bg ='transparent', height = 8, width = 4, dpi = 300)
+ggsave('img/boot_plots/p_np_accuracy_tel.png',     plots_np_edge[[2]][[5]], bg ='transparent', height = 8, width = 4, dpi = 300)
+ggsave('img/boot_plots/p_np_accuracy.png',         plots_np_edge[[6]][[2]], bg ='transparent', height = 16, width = 16, dpi = 300)
+
+#ggsave('img/boot_plots/p_np_difference.png',   plots_np_diff[[1]], bg ='transparent')
+#ggsave('img/boot_plots/p_np_difference_s.png', plots_np_diff[[2]], bg ='transparent')
+
+ggsave('img/boot_plots/p_cd_stability_all.png',    plots_cd_stre[[5]][[1]],      bg ='transparent', height = 5, width = 10, dpi = 300)
+ggsave('img/boot_plots/p_cd_stability_f2f.png',    plots_cd_stre[[5]][[2]],      bg ='transparent', height = 5, width = 10, dpi = 300)
+ggsave('img/boot_plots/p_cd_stability_mail.png',   plots_cd_stre[[5]][[3]],      bg ='transparent', height = 5, width = 10, dpi = 300)
+ggsave('img/boot_plots/p_cd_stability_web.png',    plots_cd_stre[[5]][[4]],      bg ='transparent', height = 5, width = 10, dpi = 300)
+ggsave('img/boot_plots/p_cd_stability_tel.png',    plots_cd_stre[[5]][[5]],      bg ='transparent', height = 5, width = 10, dpi = 300)
+ggsave('img/boot_plots/p_cd_stability.png',        plots_cd_stre[[6]],           bg ='transparent', height = 5, width = 10, dpi = 300)
+``` 
+
+
+```{r}
+plots_np_edge
+plots_cd_stre
+```
+
+# Nodewise interactions
+
+I created functions to extract the pairwise interactions of the node levels, merges it into a dataframe instead of an ugly list, and saves it. These dataframes do not include the aggregate estimate for the node, because that information is stored somewhere else in the model object (annoying). A challenge for another day. 
+
+```{r}
+# get all the interactions in a list:
+overall_ints    <- get_interactions(network = mgm_all,  n_nodes = 11, separate = TRUE)
+f2f_ints        <- get_interactions(network = mgm_f2f,  n_nodes = 10, separate = TRUE)
+mail_ints       <- get_interactions(network = mgm_mail, n_nodes = 10, separate = TRUE)
+web_ints        <- get_interactions(network = mgm_web,  n_nodes = 10, separate = TRUE)
+tel_ints        <- get_interactions(network = mgm_tel,  n_nodes = 10, separate = TRUE)
+
+# get all the interactions in a matrix:
+df_ints_overall <- merge_ints(interactions = overall_ints, n_nodes=11)
+df_ints_f2f     <- merge_ints(interactions = f2f_ints,     n_nodes=10)
+df_ints_mail    <- merge_ints(interactions = mail_ints,    n_nodes=10)
+df_ints_web     <- merge_ints(interactions = web_ints,     n_nodes=10)
+df_ints_tel     <- merge_ints(interactions = tel_ints,     n_nodes=10)
+
+# save the list of dataframes:
+saveRDS(df_ints_overall, "data/output/df_ints_overall.RDS")
+saveRDS(df_ints_f2f,     "data/output/df_ints_f2f.RDS")
+saveRDS(df_ints_mail,    "data/output/df_ints_mail.RDS")
+saveRDS(df_ints_web,     "data/output/df_ints_web.RDS")
+saveRDS(df_ints_tel,     "data/output/df_ints_tel.RDS")
+```
+
+```{r, eval=FALSE}
+# Overall network
+
+# get the nodewise interactions into their own dataframes:
+N1_ints  <- do.call(cbind, df_list[1:10])
+N2_ints  <- cbind(df_list[[11]], df_list[[19]])
+N3_ints  <- do.call(cbind, df_list[20:27])
+N4_ints  <- do.call(cbind, df_list[c(28:31, 33:34)])
+N5_ints  <- do.call(cbind, df_list[35:40])
+N6_ints  <- do.call(cbind, df_list[c(41:43, 45)])
+N7_ints  <- do.call(cbind, df_list[46:49])
+N8_ints  <- do.call(cbind, df_list[50:52])
+N9_ints  <- do.call(cbind, df_list[53:54])
+N10_ints <- as.data.frame(df_list[55])
+
+# add colnames for each node list:
+colnames(N1_ints) <- c("NRB_1", "NRB_2","NRR_1", "NRR_2","Year_1", "Year_2",
+                       "NotSalient_1", "Salient_1", "NotSalient_2", "Salient_2",
+                       "NoIncentive_1","Incentive_1", "NoIncentive_2", "Incentive_2",
+                       "NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                       "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "Other_1","Health_1", "Other_2", "Health_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N2_ints) <- c("NRR_1", "NRR_2", "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N3_ints) <- c("Year_1", "Year_2",
+                       "NotSalient_1", "Salient_1", "NotSalient_2", "Salient_2",
+                       "NoIncentive_1","Incentive_1", "NoIncentive_2", "Incentive_2",
+                       "NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                       "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "Other_1","Health_1", "Other_2", "Health_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N4_ints) <- c("NotSalient_1", "Salient_1", "NotSalient_2", "Salient_2",
+                       "NoIncentive_1","Incentive_1", "NoIncentive_2", "Incentive_2",
+                       "NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                       "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N5_ints) <- c("NoIncentive_1","Incentive_1", "NoIncentive_2", "Incentive_2",
+                       "NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                       "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N6_ints) <- c("NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                       "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "Other_1","Health_1", "Other_2", "Health_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N7_ints) <- c("NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                       "Other_1","Health_1", "Other_2", "Health_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N8_ints) <- c("Other_1","Health_1", "Other_2", "Health_2",
+                       "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N9_ints) <- c("NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                       "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+colnames(N10_ints) <- c("Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+# get rownames for each node list:
+rownames(N1_ints)  <- c("Paper", "F2F", "Mail", "Web", "Telephone")
+rownames(N2_ints)  <-   "NRB"
+rownames(N3_ints)  <-   "NRR"
+rownames(N4_ints)  <-   "Year"
+rownames(N5_ints)  <- c("No",     "Yes")
+rownames(N6_ints)  <- c("No",     "Yes")
+rownames(N7_ints)  <- c("No",     "Yes")
+rownames(N8_ints)  <- c("No",     "Yes")
+rownames(N9_ints)  <- c("Health", "Other")
+rownames(N10_ints) <- c("No",     "Yes")
+
+# create a dataframe with the correct dimensions:
+overall_int_df           <- data.frame(matrix(nrow = 20, ncol = 37), row.names = 1:20)
+                             
+overall_int_df$X1        <- c("Paper", "F2F",   "Mail",  "Web", "Telephone",
+                              "NRB",   "NRR",   "Year",  "No",  "Yes",
+                              "No",   "Yes",    "No",    "Yes", "No",
+                              "Yes",  "Health", "Other", "No",  "Yes")
+
+colnames(overall_int_df) <- c("Node", "NRB_1", "NRB_2","NRR_1", "NRR_2","Year_1", "Year_2",
+                              "NotSalient_1", "Salient_1", "NotSalient_2", "Salient_2",
+                              "NoIncentive_1","Incentive_1", "NoIncentive_2", "Incentive_2",
+                              "NoReminder_1","Reminder_1", "NoReminder_2", "Reminder_2",
+                              "NoSponsor_1","Sponsor_1", "NoSponsor_2", "Sponsor_2",
+                              "Other_1","Health_1", "Other_2", "Health_2",
+                              "NoSpecial_1","Special_1", "NoSpecial_2", "Special_2",
+                              "Dem_1", "Obs_1", "Unobs_1", "Dem_2", "Obs_2", "Unobs_2")
+
+# add the nodewise interactions;
+overall_int_df[1:5,2:37] <- N1_ints
+overall_int_df[6,c(4:5,32:37)] <- N2_ints
+overall_int_df[7,6:37] <- N3_ints
+overall_int_df[8,c(8:23,28:37)] <- N4_ints
+overall_int_df[9:10,12:37] <- N5_ints
+overall_int_df[11:12,c(16:27,32:37)] <- N6_ints
+overall_int_df[13:14,20:37] <- N7_ints
+overall_int_df[15:16,24:37] <- N8_ints
+overall_int_df[17:18,28:37] <- N9_ints
+overall_int_df[19:20,32:37] <- N10_ints
+
+saveRDS(overall_int_df, "data/output/overall_int_df.RDS")
+```
+
+## Spot checking
+
+```{r}
+# Survey question and nonresponse
+showInteraction(object = mgm_all, int = c(11, 3))$parameters
+# Survey mode and nonresponse
+showInteraction(object = mgm_all, int = c(1, 3))$parameters
+# Survey mode and bias
+showInteraction(object = mgm_all, int = c(1, 2))$parameters
+showInteraction(object = mgm_all, int = c(11, 2))$parameters
+
+showInteraction(object = mgm_all, int = c(2, 3))$parameters
+showInteraction(object = mgm_all, int = c(3, 4))$parameters
+
+
+# Mode with year
+showInteraction(object = mgm_all, int = c(1, 4))$parameters
+
+# Mode with incentives
+showInteraction(object = mgm_all, int = c(1, 6))$parameters
+# mode with reminders
+showInteraction(object = mgm_all, int = c(1, 7))$parameters
+# mode with saliency
+showInteraction(object = mgm_all, int = c(1, 5))$parameters
 
 ```
 
-# Inspecting interactions
+```{r}
+# F2F SURVEYS
+# nonresponse with saliency
+showInteraction(object = mgm_f2f, int = c(2, 4))$parameters
 
-## All modes
+# nonresponse and remindeers
+showInteraction(object = mgm_f2f, int = c(2, 6))$parameters
+
+# nonresponse and topic
+showInteraction(object = mgm_f2f, int = c(2, 8))$parameters
+
+# nonresponse and topic
+showInteraction(object = mgm_f2f, int = c(2, 9))$parameters
+
+# bias and saliency
+showInteraction(object = mgm_f2f, int = c(1, 4))$parameters
+# bias and incentives
+showInteraction(object = mgm_f2f, int = c(1, 5))$parameters
+# bias and incentives
+showInteraction(object = mgm_f2f, int = c(1, 8))$parameters
+```
+
+```{r}
+# MAIL SURVEYS
+# nonresponse and bias
+showInteraction(object = mgm_mail, int = c(1, 2))$parameters
+# nonresponse and saliency
+showInteraction(object = mgm_mail, int = c(2, 4))$parameters  
+# nonresponse and sponsorship
+showInteraction(object = mgm_mail, int = c(2, 7))$parameters
+# nonresponse and special pops
+showInteraction(object = mgm_mail, int = c(2, 9))$parameters
+# nonresponse and question
+showInteraction(object = mgm_mail, int = c(2, 10))$parameters
+```
+
+```{r}
+# WEB SURVEYS
+# NONRESPONSE and topic
+showInteraction(object = mgm_web, int = c(2,8))$parameters
+# NONRESPONSE and incentives
+showInteraction(object = mgm_web, int = c(2,5))$parameters
+
+# bias and qtype
+showInteraction(object = mgm_web, int = c(1,10))$parameters
+
+showInteraction(object = mgm_web, int = c(4,5))$parameters
+showInteraction(object = mgm_web, int = c(9,5))$parameters
+```
+
+```{r}
+# TELEPHONE
+showInteraction(object = mgm_tel, int = c(1, 10))$parameters
+
+showInteraction(object = mgm_tel, int = c(2, 8))$parameters
+```
 
 ```{r, eval=F}
 # Interactions - whole network
@@ -672,7 +1169,7 @@ showInteraction(object = mgm_all, int = c(1, 2))$parameters
 showInteraction(object = mgm_all, int = c(1, 10))$parameters
 
 ## Bias (1) mode (11)
-showInteraction(object = mgm_all, int = c(1, 11))$parameters
+showInteraction(object = mgm_all, int = c(1, 3))$parameters
 
 ## Modes (11) and NR (2)
 showInteraction(object = mgm_all, int = c(2, 11))$parameters
@@ -703,19 +1200,6 @@ showInteraction(object = mgm_all, int = c(11, 10))$parameters
 
 showInteraction(object = mgm_all, int = c(2, 4))$parameters
 ```
-
-* Estimating the MGM on the entire dataset that includes face-to-face, web, mail, and paper survey modes results in a very dense network (**Figure 3**).
-* Of interest is the connections to nonresponse bias (1) and nonresponse rates (2). A positive edge between these two nodes is driven by a direct effect of nonresponse rates on nonresponse bias. Specifically, a one unit increase in nonresponse rates leads to a 0.19 unit increase in nonresponse bias. Conversely, the regression in the opposite direction is estimated to be zero. 
-* Survey mode (11) is also connected to nonresponse bias (1) and nonresponse rate (2). Paper surveys are the reference category, relative to which nonresponse rates decrease for face-to-face (-1.23), mail (-0.34), and telephone (-0.47). Nonresponse rates for web surveys do not differ from paper surveys. Nonresponse bias only decreases for mail surveys relative to paper surveys (-0.04 ). 
-* The type of question asked is connected to nonresponse bias, whereby it decreases for unobservable characteristics relative to demographic characteristics
-* Nonresponse rates increase when surveys are fielded in special populations (0.46), when participants are incentivised (0.24), when surveys are salient (0.15). Conversely, nonresponse rates decreases for health surveys (-0.14), sponsored surveys (-0.34), when reminders are used (-0.12).
-
-Other 
-* Face-to-face and web surveys are less likely to be incentivised than mail, paper, and telephone surveys. 
-* Web surveys less salient. Mail surveys more salient. 
-* Telephone surveys more likely to be sponsored.
-* Face-to-face and paper more likely to be health surveys. 
-* Face-to-face and telephone surveys more likely to be fielded in special populations. 
 
 ### F2F surveys
 
@@ -752,12 +1236,6 @@ showInteraction(object = mgm_f2f, int = c(2, 9))$parameters
 showInteraction(object = mgm_f2f, int = c(2, 10))$parameters
 ```
 
-* Estimating the MGM on face-to-face surveys also results in a very dense network (**Figure 4**).
-* Here, nonresponse bias is again connected to the type of question asked (note: question type is not predicting bias but as bias increases it is less likely to be a demographic question (-1.91).
-* Additionally, nonresponse bias decreases by -0.29 if the survey is salient, -0.42 if incentives are used, -0.10 for health surveys. Note: connection between bias and reminders indicates as bias increases more likely to be a survey where reminders are “undetermined” (0.85).
-* Nonresponse rates not connected to bias. 
-* Nonresponse rates are connected to question type (0.74 for observable), special populations (1.73), health surveys (1.03), reminders (2.70 for reminders and 0.86 for undetermined), saliency (-2.29).
-
 ### Web surveys
 
 ```{r, eval=F}
@@ -786,10 +1264,6 @@ showInteraction(object = mgm_web, int = c(2, 9))$parameters
 ## NR (2) and question type (10)
 showInteraction(object = mgm_web, int = c(2, 10))$parameters
 ```
-
-* Nonresponse rates and nonresponse bias not connected.
-* Nonresponse bias connected to question type (3.24 for observable) and reminders (0.29 for using reminders).
-* Nonresponse rates connected to question type (-1.32 observable, 0.34 unobservable), special populations (0.83), health surveys (0.35), reminders (0.85 for using reminders), incentives (1.75), saliency (0.65). 
 
 ### Mail surveys
 
@@ -829,12 +1303,6 @@ showInteraction(object = mgm_mail, int = c(2, 9))$parameters
 showInteraction(object = mgm_mail, int = c(2, 10))$parameters
 ```
 
-* Again, a very dense network. 
-* Nonresponse rates and nonresponse bias are connected, where a unit increase in nonresponse rates cause a 0.21 unit increase in nonresponse bias. 
-* Nonresponse bias is also connected to reminders and question type. As nonresponse bias increases, more likely to be surveys where reminders could not be determined. Similarly, as nonresponse bias increases, questions are more likely to be demographic (0.14) and less likely to be unobservable (-0.13).
-* Nonresponse rates are connected to question type (-0.37), special population (0.63), health surveys (-0.15), sponsorship (-0.35), reminders (-0.09 when used), incentives (0.22), saliency (0.19) and year (0.06). 
-
-
 ### Telephone surveys
 
 ```{r, eval=F}
@@ -856,7 +1324,7 @@ showInteraction(object = mgm_tel, int = c(2, 7))$parameters
 showInteraction(object = mgm_tel, int = c(2, 8))$parameters
 ```
 
-* Only see a relationship with bias in surveys where reminders is "undetermined", where bias increases by 0.44.
-* When reminders are used nonresponse decreases by -0.67, when it is undetermiend nonresponse increases by 0.65.
+
+
 
 

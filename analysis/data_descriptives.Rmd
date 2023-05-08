@@ -64,6 +64,7 @@ knitr::opts_chunk$set(
 library(kableExtra)
 library(tidyverse)
 library(gtsummary)
+library(ggnewscale)
 library(ggplot2)
 library(jcolors)
 library(weights)
@@ -73,6 +74,7 @@ library(ggsci)
 library(readr)
 # My own functions:
 source("functions.R")
+source("plot_theme.R")
 # Data:
 data <- readRDS("data/input/data.RDS")
 ```
@@ -81,7 +83,7 @@ data <- readRDS("data/input/data.RDS")
 
 ## Table 1. Survey Characteristics
 
-```{r, warning=F, }
+```{r, eval=Fwarning=F}
 data %>%
   select(Mode, Topic_Health, Qtype, special_population, Saliency, Incentivised, Reminder, Sponsorship) %>% 
   tbl_summary(by           = Mode,
@@ -112,76 +114,53 @@ data %>%
   as_kable_extra(booktabs = TRUE, longtable = TRUE, linesep = "") %>% 
   kableExtra::kable_classic(position = "left", full_width = F) %>% 
   row_spec(0, bold = TRUE) %>% 
-  row_spec(c(4,9,16,20,24,28), italic  = TRUE) %>% 
-  footnote(general_title = "Statistics:",
-           general       = "<i>% (n)</i>", escape = FALSE)
+  row_spec(c(4,9,16,20,24,28), italic  = TRUE)
+  #footnote(general_title = "Statistics:",
+           #general       = "<i>% (n)</i>", escape = FALSE)
 ```
 
-## Table 2. NR and NRB in Groves and Peytcheva (2008) vs New Studies
+## Table 2. NR and NRB in Groves and Peytcheva (2008) vs New Studies and by Mode
 
 ```{r}
-t2_groves <- data %>% 
+# NR and Bias by Studies
+t_groves <- data %>% 
               mutate(Groves = recode(Groves, "1" = "Groves",
                                              "0" = "New studies")) %>% 
               drop_na(Groves)  %>% 
               group_by(Groves) %>% 
+              rename("Characteristic" = "Groves") %>% 
               summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
                         "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
                         "N"                      = n()) %>% 
              arrange(desc(N))
 
-saveRDS(t2_groves, "tables/t2_groves.RDS")
-#write_csv(t2_groves, "tables/t2_groves.csv")
+saveRDS(t_groves, "tables/t_groves.RDS")
 
-t2_groves %>% 
-  kbl(col.names = c("Studies", "Nonresponse Rate", "Absolute Relative Bias", "N"), 
-      digits    = 2,
-      align     = c("l", "c", "c"),
-      booktabs  = T,
-      linesep   = "",
-      caption   = "NR and NRB in the current meta-analysis compared to an earlier meta-analysis") %>% 
-  kable_classic(position      = "left",
-                latex_options = "HOLD_position",
-                full_width    = F) %>% 
-  column_spec(c(1, 2, 3), width = "12em") %>% 
-  column_spec(1, bold = T) %>% 
-  row_spec(0, bold    = T) %>% 
-  footnote(general    = "Nonresponse rate and absolute relative bias are expressed as a percentage.")
-```
-
-## Table 3. NR and NRB by Survey Mode
-
-```{r}
-t3_modes <- data %>% 
+# NR and Bias by Modes
+t_modes <- data %>% 
              drop_na(Mode)  %>% 
              group_by(Mode) %>% 
+             rename("Characteristic" = "Mode") %>% 
              summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
                        "Absolute Relative Bias" = mean(AbsRelbias, na.rm=TRUE),
                        "N"                      = n()) %>% 
              arrange(desc(N))
 
-saveRDS(t3_modes, "tables/t3_modes.RDS")
-#write_csv(t3_modes, "tables/t3_modes.csv")
+saveRDS(t_modes, "tables/t_modes.RDS")
 
-t3_modes %>% 
-  kbl(digits   = 2,
-      align    = c("l", "c", "c"),
-      booktabs = T,
-      linesep  = "",
-      caption  = "Nonresponse rates and absolute relative bias by survey mode") %>% 
-  kable_classic(position      = "left",
-                latex_options = "HOLD_position",
-                full_width    = F) %>% 
-  column_spec(c(1, 2, 3), width = "12em") %>% 
-  column_spec(1, bold = T) %>% 
-  row_spec(0, bold = T) %>% 
-  footnote(general = "Nonresponse rate and absolute relative bias are expressed as a percentage.")
+# Combine both tables
+t_groves_modes <- rbind(t_groves, t_modes)
+
+# Save the tables
+saveRDS(t_groves, "tables/t_groves.RDS")
+saveRDS(t_modes, "tables/t_modes.RDS")
+saveRDS(t_groves_modes, "tables/t_groves_modes.RDS")
 ```
 
-## Table 4. NR and NRB by Country
+## Table 3. NR and NRB by Country
 
 ```{r}
-t4_country <- data %>% 
+t_country <- data %>% 
                drop_na(Country) %>% 
                group_by(Country) %>% 
                summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
@@ -189,28 +168,13 @@ t4_country <- data %>%
                          "N"                      = n()) %>% 
                arrange(desc(N))
 
-saveRDS(t4_country, "tables/t4_country.RDS")
-#write_csv(t4_country, "tables/t4_country.csv")
-
-t4_country %>% 
-  kbl(digits   = 2,
-      align    = c("l", "c", "c"),
-      booktabs = T,
-      linesep  = "",
-      caption  = "Nonresponse rates and absolute relative bias by country") %>% 
-  kable_classic(position      = "left",
-                latex_options = "HOLD_position",
-                full_width    = F) %>% 
-  column_spec(c(1, 2, 3), width = "12em") %>% 
-  column_spec(1, bold = T) %>% 
-  row_spec(0, bold = T) %>% 
-  footnote(general = "Nonresponse rate and absolute relative bias are expressed as a percentage.")    
+saveRDS(t_country, "tables/t_country.RDS")
 ```
 
-## Table 5. NR and NRB by Information Source on Nonrespondents
+## Table 4. NR and NRB by Information Source on Nonrespondents
 
 ```{r}
-t5_source <- data %>% 
+t_source <- data %>% 
               drop_na(Source) %>% 
               group_by(Source) %>% 
               summarise("Nonresponse Rate"       = mean(MN, na.rm=TRUE),
@@ -218,10 +182,9 @@ t5_source <- data %>%
                         "N"                      = n()) %>% 
               arrange(desc(N))
 
-saveRDS(t5_source, "tables/t5_source.RDS")
-#write_csv(t5_source, "tables/t5_source.csv")
+saveRDS(t_source, "tables/t_source.RDS")
 
-t5_source %>% 
+t_source %>% 
   kbl(digits   = 2,
       align    = c("l", "c", "c"),
       booktabs = T,
@@ -241,107 +204,152 @@ t5_source %>%
 ## Figure 1. Weighted Correlation of NR and NRB
 
 ```{r}
+data %>% 
+        ggplot(aes(MN, AbsRelbias, colour = Groves)) +
+        geom_jitter(data = filter(data, Groves == 0), alpha = 0.3,   size = 2, shape = 19) +
+        geom_jitter(data = filter(data, Groves == 1), alpha = 0.5,   size = 3, shape = 18) +
+        geom_smooth(data = filter(data, Groves == 0), method = "lm", color = "darkblue", linetype = "dashed", lwd = 0.7, se = F) +
+        geom_smooth(data = filter(data, Groves == 1), method = "lm", color = "orange3", linetype = "solid", lwd = 0.7, se = F) +
+  
+        scale_y_continuous(expand  = c(0, 0), limits = c(-2, 100)) +
+        scale_x_continuous(expand  = c(0, 2), limits = c(0, 100)) +
+  
+        #scale_fill_manual(values = c("#386cb0", "#fec66b")) +
+        scale_colour_manual(values = c("#386cb0", "#fec66b"),
+                            name = "",
+                            labels = c("New studies", "Groves and Peytcehva (2008)")) +
+
+        labs(x     = "Nonresponse Rate (%)",
+             y     = "Nonresponse Bias (%)") +
+  
+        theme_thesis() +
+        theme(
+              legend.position   = "top",
+              legend.background = element_rect(fill = 'transparent', color = NA),
+              panel.background  = element_rect(fill = 'transparent', color = NA), 
+              plot.background   = element_rect(fill = 'transparent', color = NA))
+```
+
+```{r, warning=F}
 p1 <- data %>% 
         ggplot(aes(MN, AbsRelbias, colour = Groves)) +
-        geom_jitter(alpha  = 0.5,  size   = 2, shape = 21) +
-        geom_smooth(method = "lm", se     = FALSE) +
-        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
+        geom_jitter(data = filter(data, Groves == 0), alpha = 0.3,   size = 2, shape = 19) +
+        geom_jitter(data = filter(data, Groves == 1), alpha = 0.5,   size = 3, shape = 18) +
+        geom_smooth(data = filter(data, Groves == 0), method = "lm", color = "darkblue", linetype = "dashed", lwd = 1.2, se = F) +
+        geom_smooth(data = filter(data, Groves == 1), method = "lm", color = "orange3", linetype = "solid", lwd = 1, se = F) +
+  
         scale_y_continuous(expand  = c(0, 0), limits = c(-2, 100)) +
+        scale_x_continuous(expand  = c(0, 2), limits = c(0, 100)) +
+  
+        scale_colour_manual(values = c("#386cb0", "#fec66b"),
+                            name = "",
+                            labels = c("New studies", "Groves and Peytcehva (2008)")) +
+
         labs(x     = "Nonresponse Rate (%)",
-             y     = "Absolute Relative Bias (%)") +
-        theme_nice() +
+             y     = "Nonresponse Bias (%)") +
+  
+        theme_thesis() +
         theme(
-              #axis.title.x = element_blank(),
+              legend.position   = "top",
+              legend.background = element_rect(fill = 'transparent', color = NA),
               panel.background  = element_rect(fill = 'transparent', color = NA), 
               plot.background   = element_rect(fill = 'transparent', color = NA))
 
-ggsave('img/p3_nrb_cor.png', p1, bg = 'transparent')
+ggsave('img/descriptive_plots/p_within.pdf', p1, bg = 'transparent')
 
 p2 <- data %>% 
         ggplot(aes(MN, meanNRbias, colour = Groves)) + 
-        geom_jitter(alpha = 0.5, size = 2, shape = 21) +
-        geom_smooth(method = "lm", se = FALSE) +
-        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
-        scale_y_continuous(expand = c(0, 0), limits = c(-2, 100)) +
+        geom_jitter(data = filter(data, Groves == 0), alpha = 0.3,   size = 2, shape = 19) +
+        geom_jitter(data = filter(data, Groves == 1), alpha = 0.3,   size = 3, shape = 18) +
+        geom_smooth(data = filter(data, Groves == 0), method = "lm", color = "darkblue", linetype = "dashed", lwd = 1.2, se = F) +
+        geom_smooth(data = filter(data, Groves == 1), method = "lm", color = "orange3", linetype = "solid", lwd = 1, se = F) +
+  
+        scale_y_continuous(expand  = c(0, 0), limits = c(-2, 100)) +
+        scale_x_continuous(expand  = c(0, 2), limits = c(0, 100)) +
+  
+        scale_colour_manual(values = c("#386cb0", "#fec66b"),
+                            name = "",
+                            labels = c("New studies", "Groves and Peytcehva (2008)")) +
+
         labs(x     = "Nonresponse Rate (%)",
-             y     = "Mean Absolute Relative Bias (%)") +
-        theme_nice() +
+             y     = "Mean Nonresponse Bias (%)") +
+  
+        theme_thesis() +
         theme(
-              #axis.title.x = element_blank(),
+              legend.position   = "top",
+              legend.background = element_rect(fill = 'transparent', color = NA),
               panel.background  = element_rect(fill = 'transparent', color = NA), 
               plot.background   = element_rect(fill = 'transparent', color = NA))
 
-ggsave('img/p4_nrb_wcor.png', p2, bg = 'transparent')
+ggsave('img/descriptive_plots/p_between.pdf', p2, bg = 'transparent')
 
-p_cors <- ggarrange(p1, p2,
-                    ncol   = 2,
-                    labels = c("A", "B"), 
-                    legend = "none") %>%
-  
-          annotate_figure(bottom = text_grob("Nonresponse Rate (%)", size = 11, face = "bold"))
+p_within_between <- ggarrange(p1, p2, ncol = 2, legend = "top", common.legend = TRUE)
 
-ggsave('img/p_cors.png', p_cors, bg = 'transparent')
-
-p_cors
+ggsave('img/descriptive_plots/p_within_between.pdf', p_within_between, bg = 'transparent', width = 10, height = 5)
 ```
 
 ## Figure 1. Yearly Change in NR and NRB 
 
-```{r}
+```{r, warning=F}
 p3 <- data %>% 
         ggplot(aes(Year, MN, colour = Groves)) +
-        geom_point(alpha = 0.5, size = 2, shape = 21) +
-        geom_smooth(method = "lm", se = FALSE) +
-        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
-        scale_y_continuous(expand = c(0, 0), limits = c(-2, 100)) +
+        geom_point(data = filter(data, Groves == 0), alpha = 0.3,   size = 2, shape = 19) +
+        geom_point(data = filter(data, Groves == 1), alpha = 0.3,   size = 3, shape = 18) +
+        geom_smooth(data = filter(data, Groves == 0), method = "lm", color = "darkblue", linetype = "dashed", lwd = 1.2, se = F) +
+        geom_smooth(data = filter(data, Groves == 1), method = "lm", color = "orange3", linetype = "solid", lwd = 1, se = F) +
+        scale_colour_manual(values = c("#386cb0", "#fec66b"),
+                            name = "",
+                            labels = c("New studies", "Groves and Peytcehva (2008)")) +
+
         labs(x     = "Year",
              y     = "Nonresponse Rate (%)") +
-        theme_nice() +
+  
+        theme_thesis() +
         theme(
-              #axis.title.x          = element_blank(),
-              panel.background      = element_rect(fill = 'transparent', color = NA), 
-              plot.background       = element_rect(fill = 'transparent', color = NA))
+              legend.position   = "top",
+              legend.background = element_rect(fill = 'transparent', color = NA),
+              panel.background  = element_rect(fill = 'transparent', color = NA), 
+              plot.background   = element_rect(fill = 'transparent', color = NA))
 
-ggsave('img/p5_nr_year.png', p3, bg = 'transparent')
+ggsave('img/descriptive_plots/p_nr_year.pdf', p3, bg = 'transparent')
 
 p4 <- data %>% 
-        ggplot(aes(Year, AbsRelbias, colour = Groves)) +
-        geom_point(alpha = 0.5, size = 2, shape = 21) +
-        geom_smooth(method = "lm", se = FALSE) +
-        scale_colour_manual(values = c("#273B5B", "#C1C243"), name = "", labels = c("New studies", "Groves")) +
-        labs(x     = "Year",
-             y     = "Absolute Relative Bias (%)") +
-        theme_nice() +
-        theme(
-              #axis.title.x          = element_blank(),
-              panel.background      = element_rect(fill = 'transparent', color = NA), 
-              plot.background       = element_rect(fill = 'transparent', color = NA))
-
-ggsave('img/p6_nrb_year.png', p4, bg = 'transparent')
-
-p_year <- ggarrange(p3, p4,
-                    ncol   = 2,
-                    labels = c("A", "B"), 
-                    legend = "none") %>%
+       ggplot(aes(Year, AbsRelbias, colour = Groves)) +
+        geom_point(data = filter(data, Groves == 0), alpha = 0.3,   size = 2, shape = 19) +
+        geom_point(data = filter(data, Groves == 1), alpha = 0.3,   size = 3, shape = 18) +
+        geom_smooth(data = filter(data, Groves == 0), method = "lm", color = "darkblue", linetype = "dashed", lwd = 1.2, se = F) +
+        geom_smooth(data = filter(data, Groves == 1), method = "lm", color = "orange3", linetype = "solid", lwd = 1, se = F) +
   
-          annotate_figure(bottom = text_grob("Year", face = "bold", size = 11))
+        #scale_colour_manual(values = c("#386cb0", "#fec66b")) +
+        scale_colour_manual(values = c("#386cb0", "#fec66b"),
+                            name = "",
+                            labels = c("New studies", "Groves and Peytcehva (2008)")) +
 
-ggsave('img/p_year.png', p_year, bg='transparent')
+        labs(x     = "Year",
+             y     = "Nonresponse Bias (%)") +
+  
+        theme_thesis() +
+        theme(
+              legend.position   = "top",
+              legend.background = element_rect(fill = 'transparent', color = NA),
+              panel.background  = element_rect(fill = 'transparent', color = NA), 
+              plot.background   = element_rect(fill = 'transparent', color = NA))
 
-p_year
-```
 
-```{r}
-p_all_cors <- ggarrange(p1, p2, p3, p4, 
+ggsave('img/descriptive_plots/p_nrb_year.pdf', p4, bg = 'transparent')
+
+p_year <- ggarrange(p3, p4, ncol = 2, legend = "top", common.legend = TRUE) 
+
+ggsave('img/descriptive_plots/p_year.png', p_year, bg='transparent', width = 10, height = 5)
+
+p_everthing <- ggarrange(p1, p2, p3, p4, 
                         ncol   = 2,
                         nrow   = 2,
                         labels = c("A", "B", "C", "D"), 
                         legend = "bottom",
                         common.legend = TRUE)
   
-ggsave('img/p_all_cors.png', p_all_cors, bg='transparent')
-
-p_all_cors
+ggsave('img/descriptive_plots/p_everthing.pdf', p_everthing, bg='transparent', width = 10, height = 10)
 ```
 
 ## Figure 2. Distribution of NR and NRB by Survey Mode
@@ -354,40 +362,45 @@ p5 <- data %>%
         stat_summary(fun.data=data_summary, alpha = 0.6) +
         labs(x = "", y = "Nonresponse Rate (%)") +
         scale_y_continuous(expand = c(0, 0), limits = c(-5, 100)) +
-        scale_fill_jcolors(palette = "pal9") +
-        scale_color_jcolors(palette = "pal9") +
-        theme_nice() +
+        scale_fill_thesis() +
+        scale_colour_thesis() +
+        #scale_fill_jcolors(palette  = "pal9") +
+        #scale_color_jcolors(palette = "pal9") +
+        theme_thesis() +
         theme(
               panel.background      = element_rect(fill = 'transparent', color = NA), 
               plot.background       = element_rect(fill = 'transparent', color = NA), 
-              legend.background     = element_rect(fill = 'transparent'), 
-              legend.box.background = element_rect(fill = 'transparent')) +
-        guides(color = guide_legend(override.aes = list(size = 3) ) )
+              legend.position       = "none",
+              legend.background     = element_rect(fill = 'transparent')) +
+        guides(color = guide_legend(override.aes = list(size = 3)))
+
+ggsave('img/descriptive_plots/p_nr_dist.pdf', p5, bg ='transparent')
 
 p6 <- data %>% 
         drop_na(Mode) %>% 
         ggplot(aes(x = Mode, y = AbsRelbias)) +
         geom_violin(aes(fill = Mode), alpha = 0.9) +
         stat_summary(fun.data = data_summary, alpha = 0.6) +
-        labs(x = "", y = "Absolute Relative Bias (%)") +
-        scale_y_continuous(expand = c(0, 0), limits = c(-5, 100)) +
-        scale_fill_jcolors(palette = "pal9") +
-        theme_nice() +
+        labs(x = "", y = "Nonresponse Bias (%)") +
+        scale_y_continuous(expand  = c(0, 0), limits = c(-5, 100)) +
+       scale_fill_thesis() +
+        scale_colour_thesis() +
+        #scale_fill_jcolors(palette  = "pal9") +
+        #scale_color_jcolors(palette = "pal9") +
+        theme_thesis() +
         theme(
               panel.background      = element_rect(fill = 'transparent', color = NA), 
               plot.background       = element_rect(fill = 'transparent', color = NA), 
+              legend.position       = "none",
               legend.background     = element_rect(fill = 'transparent')) +
-        guides(color = guide_legend(override.aes = list(size = 3) ) )
+        guides(color = guide_legend(override.aes = list(size = 3)))
 
-p_mode_dists <- ggarrange(p5, p6, ncol = 1,
-                         labels = c("A", "B"), 
-                         legend = "none") %>%
-  
-                annotate_figure(bottom = text_grob("Primary Survey Mode", size = 11, face = "bold"))
+ggsave('img/descriptive_plots/p_bias_dist.png', p6, bg ='transparent')
 
-ggsave('img/p_mode_dists.png', p_mode_dists, bg ='transparent')
+p_dists <- ggarrange(p5, p6, ncol = 1, labels = c("A", "B"), legend = "none") %>%
+           annotate_figure(bottom = text_grob("Primary Survey Mode", face = "bold", size = 14))
 
-p_mode_dists
+ggsave('img/descriptive_plots/p_dists.pdf', p_dists, bg ='transparent', height = 10, width = 10)
 ```
 
 

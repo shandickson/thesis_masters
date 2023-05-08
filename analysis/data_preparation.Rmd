@@ -238,7 +238,7 @@ data <- data %>% mutate(Population = fct_recode(PopType, "Hospital patients" = "
 Some NULL values are recoded for the variable `Reminder`.
 
 ```{r, echo=F}
-data <- data %>% mutate(Reminder = fct_recode(Reminder, "Undetermined" = "No info"))
+data <- data %>% mutate(Reminder = fct_recode(Reminder, "No" = "No info"))
 ```
 
 Some NULL values are recoded for the variable `Incentives`.
@@ -286,12 +286,6 @@ Deselect old variable we no longer need.
 
 ```{r, echo=F}
 data <- data %>% select(-c(ModeA, TopicSalien, CountryData, Urbanicity, Specialpop))
-```
-
-Impute missingness:
-
-```{r, echo=F}
-
 ```
 
 Later, we will perform analysis on each type of survey mode. To make this easier, we create separate dataframes for this purpose now. 
