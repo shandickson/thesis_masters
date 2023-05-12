@@ -49,9 +49,9 @@ You can jump below to see the full structure of the repository, but I want to br
 * Inside `img` and `tables` there are `.png`/`.pdf` images and `.RDS` files that are used when compiling the written manuscript. 
 
 
-Note: If running the bootstrap procedure again this can take somewhere between 12-18 hours. The results of this procedure are saved in the `output` folder as `boots_casedropping.RDS` and `boots_nonparametric.RDS`. I recommend you skip re-running the bootstrap and just use the saved output files. \
+Note: If running the bootstrap procedure again this can take somewhere between 12-18 hours. The results of this procedure are saved in the `output` folder as `boots_casedropping.RDS` and `boots_nonparametric.RDS`. I recommend you skip re-running the bootstrap and just use the saved output files. 
 
-The structure of the repository is as follows: \
+The structure of the repository is as follows: 
 ```
 ├── analysis
 │   ├── analysis.Rproj
@@ -324,7 +324,7 @@ I'd like to acknowledge Dr Peter Lugtig and Dr Bella Struminskaya for their supe
 
 ## Contact
 
-You can contact me using the email addresses below: \
+You can contact me using the email addresses below: 
 
 Student: s.s.dickson@students.uu.nl \
 Private: shannonsdickson@gmail.com
