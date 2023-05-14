@@ -57,6 +57,7 @@ knitr::opts_chunk$set(
 **Contributions**: Thanks to Professor Peter Lugtig et al. for providing the dataset. 
 
 ```{r, include=FALSE}
+# Load the required packages:
 library(dplyr)
 library(magrittr)
 library(stringr)
@@ -67,24 +68,24 @@ source("functions.R")
 Load the data:
 
 ```{r, echo=F}
+# Read in the raw data:
 data <- readRDS("data/input/nonresponse_database.RDS")
 ```
 
 Select the main variables that I am interested in:
 
 ```{r, echo=F}
-data <- data %>% select(ID, Article, StatsID, Author, Year, CountryData, DataCollDays, MaxNCAttempts, LenghthMin, NQuestions, Prenotification,
-                        Sponsorship, Incentiveamount, Reminder, Nreminder, ModeA, ModeB, Topic, TopicSalien, Incentives, Qtype, PopType, Urbanicity,
-                        StatsType, StatsRelevance, SSizeRBias, SSizeRR, Source, RR, MN, AbsRelbias, Truth, Respondents, Nonrespondents, Groves,
-                        Specialpop, SSize, meanNRbias)
+# Select only the variables we need:
+data <- data %>% select(ID, Article, StatsID, Author, Year, CountryData, DataCollDays, MaxNCAttempts, LenghthMin, NQuestions, Prenotification, Sponsorship, Incentiveamount, Reminder, Nreminder, ModeA, ModeB, Topic, TopicSalien, Incentives, Qtype, PopType, Urbanicity, StatsType, StatsRelevance, SSizeRBias, SSizeRR, Source, RR, MN, AbsRelbias, Truth, Respondents, Nonrespondents, Groves, Specialpop, SSize, meanNRbias)
 
-# Remove annoying grouping variable.
+# Remove annoying grouping variable:
 data <- data[-1] 
 ```
 
 Apply the `cleanup` function that I custom created:
 
 ```{r, echo=F}
+# Apply the cleanup function, which is custom made:
 data <- cleanup(data, exclude = "Groves")
 
 # Make Groves a factor.
@@ -260,12 +261,6 @@ data <- data %>% mutate(Incentivised = fct_recode(Incentives, "Yes" = "Cash afte
                                                               "Yes" = "Yes for some respondents",
                                                               "Yes" = "Yes no specifics",
                                                               "No"  = "No info"))
-```
-
-A variable `QType_b` is created that indicates if a question relates to an observable on unobservable characteristic of the sampled person.
-
-```{r, eval = F}
-#data <- data %>% mutate(Qtype_b = fct_recode(Qtype, "Demographic" = "Observable"))
 ```
 
 The `special_populaiton` variable is created indicating if a sample person belongs to a special population or not. 

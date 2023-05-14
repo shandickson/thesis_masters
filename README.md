@@ -1,6 +1,10 @@
-# Research Master Thesis Repository
+# Research Masters Thesis: Nonresponse Bias Project
 
-Repository for my thesis conducted for completion of the Research Masters Methodology & Statistics for the Biomedical, Behavioural, & Social Sciences at Utrecht University. 
+Here you will find all the necessary information to reproduce the analysis and results in the paper:
+
+An update on the link between nonresponse rate and nonresponse bias: A network analysis
+
+for my thesis conducted for completion of the Research Masters Methodology & Statistics for the Biomedical, Behavioural, & Social Sciences at Utrecht University. 
 
 ## Table of Contents
 
