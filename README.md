@@ -11,7 +11,7 @@ Here you will find all the necessary information to reproduce the analysis and r
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
-- [Session Information](#session information)
+- [Session](#session)
 - [Acknowledgments](#acknowledgments)
 - [Contact](#contact)
 
