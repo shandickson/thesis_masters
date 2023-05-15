@@ -252,7 +252,7 @@ Note: The next step for contributors to this project would be to submit a pull r
 
 The project is licensed under the [`CC-BY-NC-4.O`](./LICENSE-CC-BY-NC-4.0.md). You can read about the conditions of this licence [here](https://creativecommons.org/licenses/by-nc/4.0/).
 
-## Session Information
+## Session
 
 Below is the session information relevant to the project and scripts in this repository.
 
