@@ -93,19 +93,6 @@ Once you have the software installed and the relevant files downloaded to your o
 │   │       ├── f2f_pairwise.RDS
 │   │       ├── mail_nodewise.RDS
 │   │       ├── mail_pairwise.RDS
-│   │       ├── mgm_all_nodewise.RDS
-│   │       ├── mgm_all_pairwise.RDS
-│   │       ├── mgm_f2f_nodewise.RDS
-│   │       ├── mgm_f2f_pairwise.RDS
-│   │       ├── mgm_mail_nodewise.RDS
-│   │       ├── mgm_mail_nodewisee.RDS
-│   │       ├── mgm_mail_pairwise.RDS
-│   │       ├── mgm_tel_nodewise.RDS
-│   │       ├── mgm_tel_nodewisee.RDS
-│   │       ├── mgm_tel_pairwise.RDS
-│   │       ├── mgm_web_nodewise.RDS
-│   │       ├── mgm_web_pairwise.RDS
-│   │       ├── overall_int_df.RDS
 │   │       ├── overall_nodewise.RDS
 │   │       ├── overall_pairwise.RDS
 │   │       ├── tel_nodewise.RDS
@@ -142,10 +129,7 @@ Once you have the software installed and the relevant files downloaded to your o
 │   │   │   ├── PRISMA.png
 │   │   │   ├── dag_extended.png
 │   │   │   ├── dag_groves.png
-│   │   │   ├── h.docx
 │   │   │   ├── network_legend.png
-│   │   │   ├── thesis_images.pptx
-│   │   │   └── title.pdf
 │   │   ├── descriptive_plots
 │   │   │   ├── p_between.pdf
 │   │   │   ├── p_between.png
