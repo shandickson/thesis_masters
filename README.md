@@ -250,7 +250,7 @@ Note: The next step for contributors to this project would be to submit a pull r
 
 ## License
 
-The project is licensed under the [`CC-BY-NC-4.O`](./LICENSE-CC-BY-NC-4.O.md). You can read about the conditions of this licence [here](https://creativecommons.org/licenses/by-nc/4.0/).
+The project is licensed under the [`CC-BY-NC-4.O`](./LICENSE-CC-BY-NC-4.0.md). You can read about the conditions of this licence [here](https://creativecommons.org/licenses/by-nc/4.0/).
 
 ## Session Information
 
