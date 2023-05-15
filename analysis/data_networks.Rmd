@@ -163,6 +163,8 @@ ggmice::plot_pattern(f, rotate = TRUE, square = TRUE)
 
 # Selecting the network data:
 
+In the code chunks below, I prepare the data according to the requirements of the `mgm` function in numerous ways. See below and search `??mgm` in the console for further information.
+
 ```{r, echo = FALSE}
 # Select the variables that we want to include in the network models:
 data_net  <- data        %>%   select(AbsRelbias, MN, Year, Saliency, Incentivised, Reminder, Sponsorship, Topic_Health, special_population, Qtype, Mode)
@@ -281,6 +283,8 @@ A simulation study suggested that moderated MGM perform better, so I will try th
 
 ## Moderated MGM
 
+Note that this is not something used in the final project or manuscript, but I keep it here for future work. Moderated `mgms` are broadly the same as splitting/stratifying the data based on a categorical variable. However, there is limited literature on this method hence I ultimately stuck with manual stratification.
+
 Estimation is the same, but I specify the moderating variable `Mode` which is variable 11. 
 
 ```{r, eval=FALSE, echo = FALSE}
@@ -364,7 +368,9 @@ for(i in 1:5) qgraph(input      = conditions[[i]]$pairwise$wadj,
 
 
 
-## Split modes
+## Stratified by modes
+
+I estimate a network for the networks stratified by survey mode, which the same core specifications.
 
 ```{r, echo = FALSE}
 # Set a seed for reproducibility:
@@ -436,6 +442,8 @@ mgm_tel <- mgm(data       = as.matrix(tel_net_list$data),
 ```
 
 ## Predictions
+
+I get the predictions for categorical and continuous nodes in each network, storing it in a list to be used when visualising the networks. 
 
 ```{r}
 # Get the network predictions:
@@ -525,6 +533,8 @@ for(i in c(4:10))   colors_tel[[i]] <- c("#fec66b")
 
 ```
 
+I store some pre-settings for visualising the network graphs.
+
 ```{r}
 # These parameters should be known for the networks:
 
@@ -572,6 +582,8 @@ mgm_web$pairwise$edgecolor  <- ifelse(mgm_web$pairwise$edgecolor == "red", "#cb4
 mgm_tel$pairwise$edgecolor  <- ifelse(mgm_tel$pairwise$edgecolor == "darkgreen", "blue",  mgm_tel$pairwise$edgecolor)
 mgm_tel$pairwise$edgecolor  <- ifelse(mgm_tel$pairwise$edgecolor == "red", "#cb4154",     mgm_tel$pairwise$edgecolor)
 ```
+
+Below I create the network graphs using `qgraph`. Run `??qgraph` in the console to get an understanding of all the plotting parameters used. 
 
 ```{r, echo = FALSE}
 # Plot the networks networks:
@@ -829,9 +841,11 @@ ggsave('img/centrality_plots/all_strength.png',  all_strength, bg ='transparent'
 
 Using the `bootnet` function from the `bootnet` package, we estimate the **Bootstrapped Confidence Intervals** which show the variability in parameter estimates that is to be expected in the data. 
 
-Note that evaluation of this chunk is set to `FALSE`, because it takes somewhere between 12-18 hours depending on your device. I recommend skipping this step and checking the saved output, or reducing the number of bootstraps to 1 in order to check the function works. 
+Note that evaluation of this chunk is set to `FALSE`, because it takes somewhere between 12-18 hours depending on your device. I recommend skipping this step and checking the saved output, or reducing the number of bootstraps, `nB`, to 1 in order to check the function works. 
 
-```{r, eval=F}
+Change the `nC` argument to the number of cores available on your device (e.g., for MacOS this is usually between 4 - 8).
+
+```{r, message=F, warning=F, eval=F}
 # I customised my own function, to perform bootstrapping over a list of networks, given some specifications (see "functions.R")
 dfs <- list(overall_net_strength, f2f_net_strength, mail_net_strength, web_net_strength, tel_net_strength)
 # Run the bootstrap tests for each network
@@ -842,7 +856,7 @@ saveRDS(boots_nonparametric, "data/output/boots_nonparametric.RDS")
 saveRDS(boots_casedropping,  "data/output/boots_casedropping.RDS")
 ```
 
-```{r, message=F,warning=F,eval=F}
+```{r, message=F, warning=F, eval=F}
 # read in the bootstrapp results:
 boots_nonparametric <- readRDS("data/output/boots_nonparametric.RDS")
 boots_casedropping <- readRDS("data/output/boots_casedropping.RDS")
@@ -894,3 +908,5 @@ saveRDS(df_ints_mail,    "data/output/df_ints_mail.RDS")
 saveRDS(df_ints_web,     "data/output/df_ints_web.RDS")
 saveRDS(df_ints_tel,     "data/output/df_ints_tel.RDS")
 ```
+
+
